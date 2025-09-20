@@ -93,7 +93,6 @@ async function callGeminiAPI(content: string): Promise<string> {
       {
         "title": "Concept Title",
         "description": "Brief description of the concept",
-        "relevance_score": 9
       }
     ]
   }
