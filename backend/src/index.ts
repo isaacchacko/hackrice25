@@ -8,6 +8,7 @@ import { get_answer } from './services/get_answer.js';
 import { make_den_main } from './services/make_den_main.js';
 import { simplify_concepts } from './services/simplify_concepts.js';
 import { search } from './services/search.js';
+import { burrow } from './services/burrow.js';
 
 // Load environment variables from root directory
 dotenv.config({ path: '../.env' });
@@ -143,6 +144,35 @@ app.get('/', (_req: Request, res: Response) => {
   console.log('🔚 make_den_main test completed\n');
 })();
 
+// Test the burrow function immediately when server starts
+(async () => {
+  console.log('🧪 Testing burrow function...');
+  
+  try {
+    const testConcept = 'machine learning';
+    const result = await burrow(testConcept, { limit: 3 });
+    
+    console.log('📊 Burrow Test Results:');
+    console.log('Concept:', testConcept);
+    console.log('Pages found:', result.length);
+    
+    if (result.length > 0) {
+      console.log('✅ Success! Found pages:');
+      result.forEach((page, index) => {
+        console.log(`${index + 1}. ${page.url}`);
+      });
+    } else {
+      console.log('❌ No pages found');
+    }
+    
+    console.log('✅ burrow test completed successfully!');
+  } catch (error) {
+    console.log('❌ burrow test failed:', error);
+  }
+  
+  console.log('🔚 burrow test completed\n');
+})();
+
 // Test the get_comparisonScore function immediately when server starts
 (async () => {
   console.log('🧪 Testing get_comparisonScore function...');
@@ -243,6 +273,29 @@ app.post('/make-den-main', async (req: Request, res: Response) => {
     res.json(result);
   } catch (error) {
     console.error('Error in /make-den-main:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/burrow', async (req: Request, res: Response) => {
+  try {
+    const { concept, limit, lang, safe, site } = req.body;
+    
+    if (!concept) {
+      return res.status(400).json({ error: 'Concept is required' });
+    }
+    
+    const burrowOptions = {
+      ...(limit && { limit }),
+      ...(lang && { lang }),
+      ...(safe && { safe }),
+      ...(site && { site })
+    };
+    
+    const result = await burrow(concept, burrowOptions);
+    res.json({ success: true, concept, pages: result });
+  } catch (error) {
+    console.error('Error in /burrow:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
