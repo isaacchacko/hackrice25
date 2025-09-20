@@ -3,9 +3,9 @@ import dotenv from 'dotenv';
 import express from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import { get_concepts } from './services/get_concepts.js';
+import { get_comparisonScore } from './services/get_comparisonScore.js';
 import { get_answer } from './services/get_answer.js';
 import { make_den_main } from './services/make_den_main.js';
-import { search } from './services/search.js';
 import { simplify_concepts } from './services/simplify_concepts.js';
 
 // Load environment variables from root directory
@@ -142,36 +142,41 @@ app.get('/', (_req: Request, res: Response) => {
   console.log('🔚 make_den_main test completed\n');
 })();
 
-// Test the search function immediately when server starts
+// Test the get_comparisonScore function immediately when server starts
 (async () => {
-  console.log('🧪 Testing search function...');
+  console.log('🧪 Testing get_comparisonScore function...');
   
   try {
-    const testQuery = 'artificial intelligence machine learning';
-    const result = await search(testQuery, { limit: 3 });
+    const testCases = [
+      { str1: "Machine Learning", str2: "ML" },
+      { str1: "Neural Networks", str2: "Artificial Neural Networks" },
+      { str1: "Deep Learning", str2: "Cooking Recipes" },
+      { str1: "Artificial Intelligence", str2: "AI" },
+      { str1: "Computer Science", str2: "Software Engineering" },
+      { str1: "Python Programming", str2: "JavaScript Development" }
+    ];
     
-    console.log('📊 Search Test Results:');
-    console.log('Query:', testQuery);
-    console.log('Pages found:', result.length);
+    console.log('📊 Comparison Score Test Results:');
     
-    if (result.length > 0) {
-      console.log('✅ Success! Found pages:');
-      result.forEach((page, index) => {
-        console.log(`${index + 1}. ${page.title ?? '(no title)'}`);
-        console.log(`   ${page.url}`);
-        if (page.snippet) console.log(`   ${page.snippet}`);
-        console.log('');
-      });
-    } else {
-      console.log('❌ No pages found');
+    for (const testCase of testCases) {
+      try {
+        const result = await get_comparisonScore(testCase.str1, testCase.str2);
+        if (result.success && result.score !== undefined) {
+          console.log(`✅ "${testCase.str1}" vs "${testCase.str2}": ${result.score}/100`);
+        } else {
+          console.log(`❌ Error comparing "${testCase.str1}" vs "${testCase.str2}": ${result.error}`);
+        }
+      } catch (error) {
+        console.log(`💥 Test failed for "${testCase.str1}" vs "${testCase.str2}":`, error);
+      }
     }
     
-    console.log('✅ search test completed successfully!');
+    console.log('✅ get_comparisonScore test completed successfully!');
   } catch (error) {
-    console.log('❌ search test failed:', error);
+    console.log('❌ get_comparisonScore test failed:', error);
   }
   
-  console.log('🔚 search test completed\n');
+  console.log('🔚 get_comparisonScore test completed\n');
 })();
 
 // API endpoints for testing the functions
@@ -237,29 +242,6 @@ app.post('/make-den-main', async (req: Request, res: Response) => {
     res.json(result);
   } catch (error) {
     console.error('Error in /make-den-main:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-app.post('/search', async (req: Request, res: Response) => {
-  try {
-    const { query, limit, lang, safe, site } = req.body;
-    
-    if (!query) {
-      return res.status(400).json({ error: 'Query is required' });
-    }
-    
-    const searchOptions = {
-      ...(limit && { limit }),
-      ...(lang && { lang }),
-      ...(safe && { safe }),
-      ...(site && { site })
-    };
-    
-    const result = await search(query, searchOptions);
-    res.json({ success: true, pages: result });
-  } catch (error) {
-    console.error('Error in /search:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
