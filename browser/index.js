@@ -20,7 +20,6 @@ function createWindow() {
 // allow for localhost usage
 app.commandLine.appendSwitch('--allow-running-insecure-content')
 app.commandLine.appendSwitch('--allow-insecure-localhost', 'true')
-app.commandLine.appendSwitch('--proxy-server', 'your-proxy-server:port')
 app.commandLine.appendSwitch('--ignore-ssl-errors')
 
 app.whenReady().then(createWindow)

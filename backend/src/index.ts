@@ -411,8 +411,8 @@ app.post('/send-to-den', async (req: Request, res: Response) => {
     const { url, node } = req.body;
 
     if (!url || !node) {
-      return res.status(400).json({ 
-        error: 'Both url and node are required' 
+      return res.status(400).json({
+        error: 'Both url and node are required'
       });
     }
 
