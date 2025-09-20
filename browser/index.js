@@ -13,7 +13,6 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js')
     },
     frame: false,
-    titleBarStyle: 'hidden',
     menu: null,
   })
 
