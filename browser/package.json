@@ -16,6 +16,7 @@
     "electron": "^38.1.2"
   },
   "dependencies": {
-    "electron-tabs": "^1.0.4"
+    "electron-tabs": "^1.0.4",
+    "node-fetch": "^2.7.0"
   }
 }

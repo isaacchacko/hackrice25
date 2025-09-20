@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import ClientLayoutWrapper from "@/components/ClientLayoutWrapper";
+import KeyboardHandler from "@/components/KeyboardHandler";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -20,6 +21,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className} suppressHydrationWarning={true}>
         <ClientLayoutWrapper>{children}</ClientLayoutWrapper>
+        <KeyboardHandler />
       </body>
     </html>
   );

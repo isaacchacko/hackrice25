@@ -4,7 +4,6 @@
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/store';
-import { url } from 'inspector';
 
 export default function SearchBar() {
   const [query, setQuery] = useState('');
@@ -19,26 +18,36 @@ export default function SearchBar() {
     // Original search functionality - opens link automatically
     const res = await fetch(`http://localhost:4000/search?query="${query}"`);
     const urlToSend = await res.json();
-    console.log(urlToSend);
     await fetch(`http://localhost:4400/url?to=${urlToSend[0].url}`)
     console.log('ran', urlToSend[0].url);
 
     // ONLY ADD: Create den for this search query
+    let denData = null;
     try {
       console.log('🏠 Creating den for search query:', query);
       const denResponse = await fetch(`http://localhost:4000/make-den-main?query=${encodeURIComponent(query)}`);
       if (denResponse.ok) {
-        const denData = await denResponse.json();
+        denData = await denResponse.json();
         console.log('🏠 Den created successfully:', denData);
+        console.log('🏠 Den data structure:', {
+          query: denData.query,
+          pages: denData.pages,
+          conceptList: denData.conceptList,
+          children: denData.children
+        });
       }
     } catch (denError) {
       console.error('❌ Failed to create den:', denError);
     }
 
-    // Original node creation
+    // Original node creation with den data
     const newNode = {
       id: `node-${nodes.length + 1}`,
-      data: { label: query },
+      data: { 
+        label: query,
+        type: 'search',
+        denData: denData
+      },
       position: {
         x: Math.random() * 400 - 200,
         y: Math.random() * 400 - 200
@@ -58,7 +67,9 @@ export default function SearchBar() {
       }
     };
 
+    console.log('📦 Creating node with data:', newNode.data);
     addNode(newNode);
+    console.log('✅ Node added to store');
   };
 
   return (

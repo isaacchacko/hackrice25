@@ -465,7 +465,22 @@ app.post('/send-to-den', async (req: Request, res: Response) => {
       });
     }
 
+    console.log('🎯 Send-to-den request received!');
+    console.log('📤 URL to process:', url);
+    console.log('🏠 Den query:', node.query);
+    console.log('📊 Den BEFORE processing:');
+    console.log('  - Pages:', node.pages, `(length: ${node.pages.length})`);
+    console.log('  - Concepts:', node.conceptList, `(length: ${node.conceptList.length})`);
+
     const result = await sendToDen(url, node);
+    
+    console.log('📊 Den AFTER processing:');
+    console.log('  - Pages:', result.node?.pages, `(length: ${result.node?.pages?.length})`);
+    console.log('  - Concepts:', result.node?.conceptList, `(length: ${result.node?.conceptList?.length})`);
+    console.log('📈 Processing stats:');
+    console.log('  - Concepts added:', result.concepts_added);
+    console.log('  - Concepts removed:', result.concepts_removed);
+    
     res.json(result);
   } catch (error) {
     console.error('Error in /send-to-den:', error);
