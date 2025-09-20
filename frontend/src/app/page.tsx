@@ -5,7 +5,7 @@ import SearchBar from "@/components/search_bar";
 export default function Home() {
   return (
     <div className="flex flex-col items-center justify-center h-screen w-screen bg-black">
-      
+
       {/* New Flex Container for Image and Title */}
       <div className="flex items-center mb-4"> {/* Use flex to align items horizontally */}
         <Image
@@ -17,7 +17,7 @@ export default function Home() {
         />
         <h1 className="text-5xl font-extrabold text-pink-500">rabbit</h1>
       </div>
-      
+
       <p className="text-slate-400 mb-8">Your journey of discovery starts here. Start burrowing.</p>
       <div className="w-full max-w-2xl">
         <SearchBar />
