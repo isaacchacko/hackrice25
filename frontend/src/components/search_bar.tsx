@@ -15,61 +15,99 @@ export default function SearchBar() {
     e.preventDefault();
     if (!query.trim()) return;
 
-    // Original search functionality - opens link automatically
-    const res = await fetch(`http://localhost:4000/search?query="${query}"`);
-    const urlToSend = await res.json();
-    await fetch(`http://localhost:4400/url?to=${urlToSend[0].url}`)
-    console.log('ran', urlToSend[0].url);
-
-    // ONLY ADD: Create den for this search query
-    let denData = null;
     try {
-      console.log('🏠 Creating den for search query:', query);
-      const denResponse = await fetch(`http://localhost:4000/make-den-main?query=${encodeURIComponent(query)}`);
-      if (denResponse.ok) {
-        denData = await denResponse.json();
-        console.log('🏠 Den created successfully:', denData);
-        console.log('🏠 Den data structure:', {
-          query: denData.query,
-          pages: denData.pages,
-          conceptList: denData.conceptList,
-          children: denData.children
-        });
+      console.log('🎯 Creating hop session for search query:', query);
+      
+      // Create hop session with 10 search results
+      const hopResponse = await fetch('http://localhost:4000/hop', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query })
+      });
+
+      if (!hopResponse.ok) {
+        throw new Error(`Failed to create hop session: ${hopResponse.status}`);
       }
-    } catch (denError) {
-      console.error('❌ Failed to create den:', denError);
+
+      const hopData = await hopResponse.json();
+      console.log('✅ Hop session created successfully!');
+      console.log('📊 Hop session details:');
+      console.log('  - Session ID:', hopData.sessionId);
+      console.log('  - Query:', hopData.hopState.query);
+      console.log('  - Total pages:', hopData.hopState.pages.length);
+      console.log('  - Current page:', hopData.currentPage.url);
+
+      // Open the first page in the hop session
+      const firstPageUrl = hopData.currentPage.url;
+      await fetch(`http://localhost:4400/url?to=${firstPageUrl}&hopSessionId=${hopData.sessionId}`);
+      console.log('🌐 Opened first page:', firstPageUrl);
+      console.log('🎯 Set hop session ID:', hopData.sessionId);
+
+      // Create den for this search query (keeping existing functionality)
+      let denData = null;
+      try {
+        console.log('🏠 Creating den for search query:', query);
+        const denResponse = await fetch(`http://localhost:4000/make-den-main?query=${encodeURIComponent(query)}`);
+        if (denResponse.ok) {
+          denData = await denResponse.json();
+          console.log('🏠 Den created successfully:', denData);
+          console.log('🏠 Den data structure:', {
+            query: denData.query,
+            pages: denData.pages,
+            conceptList: denData.conceptList,
+            children: denData.children
+          });
+        }
+      } catch (denError) {
+        console.error('❌ Failed to create den:', denError);
+      }
+
+      // Create node with both hop and den data
+      const newNode = {
+        id: `node-${nodes.length + 1}`,
+        data: { 
+          label: query,
+          type: 'search',
+          denData: denData,
+          hopSessionId: hopData.sessionId,
+          hopData: hopData.hopState
+        },
+        position: {
+          x: Math.random() * 400 - 200,
+          y: Math.random() * 400 - 200
+        },
+        style: {
+          background: '#db2777',
+          color: '#fff',
+          border: '2px solid #fff',
+          width: 100,
+          height: 100,
+          borderRadius: '50%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          textAlign: 'center' as const,
+          padding: '5px'
+        }
+      };
+
+      console.log('📦 Creating node with data:', newNode.data);
+      addNode(newNode);
+      console.log('✅ Node added to store');
+      console.log('🎮 Use Ctrl+Left/Right arrows to navigate between search results!');
+
+    } catch (error) {
+      console.error('❌ Error creating hop session:', error);
+      
+      // Fallback to original search functionality
+      console.log('🔄 Falling back to original search...');
+      const res = await fetch(`http://localhost:4000/search?query="${query}"`);
+      const urlToSend = await res.json();
+      await fetch(`http://localhost:4400/url?to=${urlToSend[0].url}`);
+      console.log('ran', urlToSend[0].url);
     }
-
-    // Original node creation with den data
-    const newNode = {
-      id: `node-${nodes.length + 1}`,
-      data: { 
-        label: query,
-        type: 'search',
-        denData: denData
-      },
-      position: {
-        x: Math.random() * 400 - 200,
-        y: Math.random() * 400 - 200
-      },
-      style: {
-        background: '#db2777',
-        color: '#fff',
-        border: '2px solid #fff',
-        width: 100,
-        height: 100,
-        borderRadius: '50%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        textAlign: 'center' as const,
-        padding: '5px'
-      }
-    };
-
-    console.log('📦 Creating node with data:', newNode.data);
-    addNode(newNode);
-    console.log('✅ Node added to store');
   };
 
   return (

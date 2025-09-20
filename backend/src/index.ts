@@ -10,6 +10,7 @@ import { search } from './services/search.js';
 import { burrow } from './services/burrow.js';
 import { get_comparisonScore } from './services/get_comparisonScore.js';
 import { sendToDen } from './services/send_toDen.js';
+import { createHopSession, getHopSession, navigateHop, getCurrentPage, getAllPages, deleteHopSession, listActiveSessions } from './services/hop.js';
 import cors from 'cors';
 
 // Load environment variables from root directory
@@ -63,16 +64,33 @@ app.get('/search', async (req: Request, res: Response) => {
   try {
     const { query, options = {} } = req.query;
 
-    if (!query) {
+    if (!query || typeof query !== 'string') {
       return res.status(400).json({ error: 'Query is required' });
+    }
+
+    // Parse options safely
+    const searchOptions: any = {};
+    if (options && typeof options === 'object' && !Array.isArray(options)) {
+      if (options.limit && typeof options.limit === 'string') {
+        searchOptions.limit = parseInt(options.limit, 10);
+      }
+      if (options.lang && typeof options.lang === 'string') {
+        searchOptions.lang = options.lang;
+      }
+      if (options.safe && typeof options.safe === 'string') {
+        searchOptions.safe = options.safe as 'off' | 'active';
+      }
+      if (options.site && Array.isArray(options.site)) {
+        searchOptions.site = options.site.filter((s): s is string => typeof s === 'string');
+      }
     }
 
     // Call your search function with the provided options
     const searchResults = await search(query, {
-      limit: options.limit || 10,
-      lang: options.lang,
-      safe: options.safe || 'active',
-      site: options.site
+      limit: searchOptions.limit || 10,
+      lang: searchOptions.lang,
+      safe: searchOptions.safe || 'active',
+      site: searchOptions.site
     });
 
     res.json(searchResults);
@@ -353,7 +371,7 @@ app.get('/make-den-main', async (req: Request, res: Response) => {
   try {
     const { query } = req.query;
 
-    if (!query) {
+    if (!query || typeof query !== 'string') {
       return res.status(400).json({ error: 'Query is required' });
     }
 
@@ -500,6 +518,170 @@ app.post('/get-comparison-score', async (req: Request, res: Response) => {
     res.json(result);
   } catch (error) {
     console.error('Error in /get-comparison-score:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Hop navigation endpoints
+app.post('/hop', async (req: Request, res: Response) => {
+  try {
+    const { query, sessionId } = req.body;
+
+    if (!query) {
+      return res.status(400).json({ error: 'Query is required' });
+    }
+
+    const id = sessionId || `hop-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const hopState = await createHopSession(query, id);
+    
+    res.json({
+      success: true,
+      sessionId: id,
+      hopState,
+      currentPage: hopState.pages[0]
+    });
+  } catch (error) {
+    console.error('Error in /hop:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/hop/:sessionId', async (req: Request, res: Response) => {
+  try {
+    const { sessionId } = req.params;
+    
+    if (!sessionId || typeof sessionId !== 'string') {
+      return res.status(400).json({ error: 'Valid sessionId is required' });
+    }
+    
+    const hopState = getHopSession(sessionId);
+    
+    if (!hopState) {
+      return res.status(404).json({ error: 'Hop session not found' });
+    }
+    
+    res.json({
+      success: true,
+      hopState,
+      currentPage: hopState.pages[hopState.currentIndex]
+    });
+  } catch (error) {
+    console.error('Error in /hop/:sessionId:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/hop/:sessionId/navigate', async (req: Request, res: Response) => {
+  try {
+    const { sessionId } = req.params;
+    const { direction } = req.body;
+
+    if (!sessionId || typeof sessionId !== 'string') {
+      return res.status(400).json({ error: 'Valid sessionId is required' });
+    }
+
+    if (!direction || !['next', 'prev'].includes(direction)) {
+      return res.status(400).json({ error: 'Direction must be "next" or "prev"' });
+    }
+
+    const hopState = navigateHop(sessionId, direction);
+    
+    if (!hopState) {
+      return res.status(404).json({ error: 'Hop session not found' });
+    }
+    
+    res.json({
+      success: true,
+      hopState,
+      currentPage: hopState.pages[hopState.currentIndex]
+    });
+  } catch (error) {
+    console.error('Error in /hop/:sessionId/navigate:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/hop/:sessionId/current', async (req: Request, res: Response) => {
+  try {
+    const { sessionId } = req.params;
+    
+    if (!sessionId || typeof sessionId !== 'string') {
+      return res.status(400).json({ error: 'Valid sessionId is required' });
+    }
+    
+    const currentPage = getCurrentPage(sessionId);
+    
+    if (!currentPage) {
+      return res.status(404).json({ error: 'Hop session not found' });
+    }
+    
+    res.json({
+      success: true,
+      currentPage
+    });
+  } catch (error) {
+    console.error('Error in /hop/:sessionId/current:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/hop/:sessionId/pages', async (req: Request, res: Response) => {
+  try {
+    const { sessionId } = req.params;
+    
+    if (!sessionId || typeof sessionId !== 'string') {
+      return res.status(400).json({ error: 'Valid sessionId is required' });
+    }
+    
+    const pages = getAllPages(sessionId);
+    
+    if (!pages) {
+      return res.status(404).json({ error: 'Hop session not found' });
+    }
+    
+    res.json({
+      success: true,
+      pages
+    });
+  } catch (error) {
+    console.error('Error in /hop/:sessionId/pages:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.delete('/hop/:sessionId', async (req: Request, res: Response) => {
+  try {
+    const { sessionId } = req.params;
+    
+    if (!sessionId || typeof sessionId !== 'string') {
+      return res.status(400).json({ error: 'Valid sessionId is required' });
+    }
+    
+    const deleted = deleteHopSession(sessionId);
+    
+    if (!deleted) {
+      return res.status(404).json({ error: 'Hop session not found' });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Hop session deleted'
+    });
+  } catch (error) {
+    console.error('Error in DELETE /hop/:sessionId:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/hop-sessions', async (req: Request, res: Response) => {
+  try {
+    const sessionIds = listActiveSessions();
+    res.json({
+      success: true,
+      sessions: sessionIds
+    });
+  } catch (error) {
+    console.error('Error in /hop-sessions:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
