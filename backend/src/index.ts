@@ -27,7 +27,6 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-
 // Request tracking to prevent infinite loops
 const activeRequests = new Set<string>();
 const requestCounts = new Map<string, number>();
@@ -50,6 +49,7 @@ function isGoogleService(url: string): boolean {
     return false;
   }
 }
+
 function resolveUrl(baseUrl: string, relativeUrl: string): string {
   try {
     return new URL(relativeUrl, baseUrl).href;
@@ -316,343 +316,139 @@ app.get('/', (_req: Request, res: Response) => {
   res.send('Backend up');
 });
 
-// Test both functions when server starts
-(async () => {
-  console.log('🧪 Testing get_concepts function...');
-
+// API endpoints for testing the functions
+app.post('/get-concepts', async (req: Request, res: Response) => {
   try {
-    const testUrl = 'https://en.wikipedia.org/wiki/Artificial_intelligence';
-    const conceptsResult = await get_concepts(testUrl);
+    const { url } = req.body;
 
-    console.log('📊 get_concepts Test Results:');
-    console.log('URL:', testUrl);
-
-    if (conceptsResult.success && conceptsResult.concepts) {
-      console.log('✅ Success! Found concepts:');
-      conceptsResult.concepts.forEach((concept, index) => {
-        console.log(`${index + 1}. ${concept.title}`);
-        console.log(`   ${concept.description}\n`);
-      });
-
-      // Test simplify_concepts with the extracted concepts plus some duplicates
-      console.log('🧪 Testing simplify_concepts function...');
-
-      // Create some duplicate concepts to test the simplification
-      const testConceptsWithDuplicates = [
-        ...conceptsResult.concepts,
-        {
-          title: "AI",
-          description: "Artificial intelligence systems that can perform human-like tasks."
-        },
-        {
-          title: "Machine Intelligence",
-          description: "Computer systems capable of learning and reasoning."
-        }
-      ];
-
-      console.log('📊 Original concepts before simplification:');
-      console.log('Total count:', testConceptsWithDuplicates.length);
-      testConceptsWithDuplicates.forEach((concept, index) => {
-        console.log(`${index + 1}. ${concept.title}`);
-        console.log(`   ${concept.description}\n`);
-      });
-
-      const simplifyResult = await simplify_concepts(testConceptsWithDuplicates);
-
-      console.log('📊 simplify_concepts Test Results:');
-
-      if (simplifyResult.success && simplifyResult.concepts) {
-        console.log('✅ Success! Simplified concepts:');
-        console.log('Final concepts count:', simplifyResult.concepts.length);
-        console.log('Concepts removed:', simplifyResult.removed_count);
-
-        simplifyResult.concepts.forEach((concept, index) => {
-          console.log(`${index + 1}. ${concept.title}`);
-          console.log(`   ${concept.description}\n`);
-        });
-
-        // Now test get_answer using the simplified concepts
-        console.log('🧪 Testing get_answer function with simplified concepts...');
-
-        const testUrls = [
-          'https://en.wikipedia.org/wiki/Artificial_intelligence',
-          'https://en.wikipedia.org/wiki/Machine_learning'
-        ];
-
-        const testQuestion = 'What are the main applications and benefits of artificial intelligence?';
-
-        const answerResult = await get_answer(testUrls, simplifyResult.concepts, testQuestion);
-
-        console.log('📊 get_answer Test Results:');
-        console.log('URLs:', testUrls);
-        console.log('Question:', testQuestion);
-        console.log('Simplified concepts used:', simplifyResult.concepts.length);
-
-        if (answerResult.success && answerResult.answer) {
-          console.log('✅ Success! Generated answer:');
-          console.log('Answer:', answerResult.answer);
-          console.log('\n📚 Short Version:', answerResult.shortAnswer);
-        } else {
-          console.log('❌ get_answer Error:', answerResult.error);
-        }
-
-      } else {
-        console.log('❌ simplify_concepts Error:', simplifyResult.error);
-      }
-
-    } else {
-      console.log('❌ get_concepts Error:', conceptsResult.error);
-      console.log('⏭️ Skipping subsequent tests due to get_concepts failure');
+    if (!url) {
+      return res.status(400).json({ error: 'URL is required' });
     }
+
+    const result = await get_concepts(url);
+    res.json(result);
   } catch (error) {
-    console.log('💥 Test failed:', error);
+    console.error('Error in /get-concepts:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
+});
 
-  console.log('🔚 All tests completed\n');
-})();
-
-// Test the make_den_main function immediately when server starts
-(async () => {
-  console.log('🧪 Testing make_den_main function...');
-
+app.post('/get-answer', async (req: Request, res: Response) => {
   try {
-    const testQuery = 'artificial intelligence machine learning';
-    const result = await make_den_main(testQuery);
+    const { urls, concepts, question } = req.body;
 
-    console.log('📊 Test Results:');
-    console.log('Query:', result.query);
-    console.log('Pages:', result.pages);
-    console.log('Concepts:', result.conceptList);
-    console.log('Children:', result.children);
+    if (!urls || !concepts || !question) {
+      return res.status(400).json({
+        error: 'urls, concepts, and question are all required'
+      });
+    }
 
-    console.log('✅ make_den_main test completed successfully!');
+    const result = await get_answer(urls, concepts, question);
+    res.json(result);
   } catch (error) {
-    console.log('❌ make_den_main test failed:', error);
+    console.error('Error in /get-answer:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
+});
 
-  console.log('🔚 make_den_main test completed\n');
-})();
-
-// Test the burrow function immediately when server starts
-(async () => {
-  console.log('🧪 Testing burrow function...');
-
+app.post('/simplify-concepts', async (req: Request, res: Response) => {
   try {
-    const testConcept = 'machine learning';
-    const result = await burrow(testConcept, { limit: 3 });
+    const { concepts } = req.body;
 
-    console.log('📊 Burrow Test Results:');
-    console.log('Concept:', testConcept);
-    console.log('Pages found:', result.length);
-
-    if (result.length > 0) {
-      console.log('✅ Success! Found pages:');
-      result.forEach((page, index) => {
-        console.log(`${index + 1}. ${page.url}`);
-      });
-    } else {
-      console.log('❌ No pages found');
+    if (!concepts || !Array.isArray(concepts)) {
+      return res.status(400).json({ error: 'concepts array is required' });
     }
 
-    console.log('✅ burrow test completed successfully!');
+    const result = await simplify_concepts(concepts);
+    res.json(result);
   } catch (error) {
-    console.log('❌ burrow test failed:', error);
+    console.error('Error in /simplify-concepts:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
+});
 
-  console.log('🔚 burrow test completed\n');
-  // Test the sendToDen function immediately when server starts
-  (async () => {
-    console.log('🧪 Testing sendToDen function...');
+app.post('/make-den-main', async (req: Request, res: Response) => {
+  try {
+    const { query } = req.body;
 
-    try {
-      // Use the parentNode from make_den_main test
-      const testQuery = 'artificial intelligence machine learning';
-      const parentNode = await make_den_main(testQuery);
+    if (!query) {
+      return res.status(400).json({ error: 'Query is required' });
+    }
 
-      console.log('📊 ParentNode BEFORE sendToDen:');
-      console.log('Query:', parentNode.query);
-      console.log('Pages count:', parentNode.pages.length);
-      console.log('Pages:', parentNode.pages);
-      console.log('Concepts count:', parentNode.conceptList.length);
-      console.log('Concepts:');
-      parentNode.conceptList.forEach((concept, index) => {
-        console.log(`  ${index + 1}. ${concept.title}: ${concept.description}`);
+    const result = await make_den_main(query);
+    res.json(result);
+  } catch (error) {
+    console.error('Error in /make-den-main:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/burrow', async (req: Request, res: Response) => {
+  try {
+    const { concept, limit, lang, safe, site } = req.body;
+
+    if (!concept) {
+      return res.status(400).json({ error: 'Concept is required' });
+    }
+
+    const burrowOptions = {
+      ...(limit && { limit }),
+      ...(lang && { lang }),
+      ...(safe && { safe }),
+      ...(site && { site })
+    };
+
+    const result = await burrow(concept, burrowOptions);
+    res.json({ success: true, concept, pages: result });
+  } catch (error) {
+    console.error('Error in /burrow:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/send-to-den', async (req: Request, res: Response) => {
+  try {
+    const { url, node } = req.body;
+
+    if (!url || !node) {
+      return res.status(400).json({ 
+        error: 'Both url and node are required' 
       });
-      console.log('Children count:', parentNode.children.length);
-      console.log('');
-
-      // Test sendToDen with a new URL
-      const testUrl = 'https://en.wikipedia.org/wiki/Machine_learning';
-      console.log(`📤 Sending to den: ${testUrl}`);
-
-      const result = await sendToDen(testUrl, parentNode);
-
-      console.log('📊 SendToDen Results:');
-      if (result.success) {
-        console.log('✅ Success!');
-        console.log('Concepts added:', result.concepts_added);
-        console.log('Concepts removed during simplification:', result.concepts_removed);
-      } else {
-        console.log('❌ Error:', result.error);
-      }
-
-      console.log('');
-      console.log('📊 ParentNode AFTER sendToDen:');
-      console.log('Query:', parentNode.query);
-      console.log('Pages count:', parentNode.pages.length);
-      console.log('Pages:', parentNode.pages);
-      console.log('Concepts count:', parentNode.conceptList.length);
-      console.log('Concepts:');
-      parentNode.conceptList.forEach((concept, index) => {
-        console.log(`  ${index + 1}. ${concept.title}: ${concept.description}`);
-      });
-      console.log('Children count:', parentNode.children.length);
-
-      console.log('✅ sendToDen test completed successfully!');
-    } catch (error) {
-      console.log('❌ sendToDen test failed:', error);
     }
 
-    console.log('🔚 sendToDen test completed\n');
-  })();
+    const result = await sendToDen(url, node);
+    res.json(result);
+  } catch (error) {
+    console.error('Error in /send-to-den:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
-  // Test the get_comparisonScore function immediately when server starts
-  (async () => {
-    console.log('🧪 Testing get_comparisonScore function...');
+app.post('/get-comparison-score', async (req: Request, res: Response) => {
+  try {
+    const { string1, string2 } = req.body;
 
-    try {
-      const testCases = [
-        { str1: "Machine Learning", str2: "ML" },
-        { str1: "Neural Networks", str2: "Artificial Neural Networks" },
-        { str1: "Deep Learning", str2: "Cooking Recipes" },
-        { str1: "Artificial Intelligence", str2: "AI" },
-        { str1: "Computer Science", str2: "Software Engineering" },
-        { str1: "Python Programming", str2: "JavaScript Development" }
-      ];
-
-      console.log('📊 Comparison Score Test Results:');
-
-      for (const testCase of testCases) {
-        try {
-          const result = await get_comparisonScore(testCase.str1, testCase.str2);
-          if (result.success && result.score !== undefined) {
-            console.log(`✅ "${testCase.str1}" vs "${testCase.str2}": ${result.score}/100`);
-          } else {
-            console.log(`❌ Error comparing "${testCase.str1}" vs "${testCase.str2}": ${result.error}`);
-          }
-        } catch (error) {
-          console.log(`💥 Test failed for "${testCase.str1}" vs "${testCase.str2}":`, error);
-        }
-      }
-
-      console.log('✅ get_comparisonScore test completed successfully!');
-    } catch (error) {
-      console.log('❌ get_comparisonScore test failed:', error);
+    if (!string1 || !string2) {
+      return res.status(400).json({ error: 'Both string1 and string2 are required' });
     }
 
-    console.log('🔚 get_comparisonScore test completed\n');
-  })();
+    const result = await get_comparisonScore(string1, string2);
+    res.json(result);
+  } catch (error) {
+    console.error('Error in /get-comparison-score:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
-  // API endpoints for testing the functions
-  app.post('/get-concepts', async (req: Request, res: Response) => {
-    try {
-      const { url } = req.body;
+app.use((req: Request, res: Response) => {
+  res.status(404).json({ error: 'Not Found', path: req.path });
+});
 
-      if (!url) {
-        return res.status(400).json({ error: 'URL is required' });
-      }
+app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+  console.error(err);
+  res.status(500).json({ error: 'Internal Server Error' });
+});
 
-      const result = await get_concepts(url);
-      res.json(result);
-    } catch (error) {
-      console.error('Error in /get-concepts:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-  app.post('/get-answer', async (req: Request, res: Response) => {
-    try {
-      const { urls, concepts, question } = req.body;
-
-      if (!urls || !concepts || !question) {
-        return res.status(400).json({
-          error: 'urls, concepts, and question are all required'
-        });
-      }
-
-      const result = await get_answer(urls, concepts, question);
-      res.json(result);
-    } catch (error) {
-      console.error('Error in /get-answer:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-  app.post('/simplify-concepts', async (req: Request, res: Response) => {
-    try {
-      const { concepts } = req.body;
-
-      if (!concepts || !Array.isArray(concepts)) {
-        return res.status(400).json({ error: 'concepts array is required' });
-      }
-
-      const result = await simplify_concepts(concepts);
-      res.json(result);
-    } catch (error) {
-      console.error('Error in /simplify-concepts:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-  app.post('/make-den-main', async (req: Request, res: Response) => {
-    try {
-      const { query } = req.body;
-
-      if (!query) {
-        return res.status(400).json({ error: 'Query is required' });
-      }
-
-      const result = await make_den_main(query);
-      res.json(result);
-    } catch (error) {
-      console.error('Error in /make-den-main:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-  app.post('/burrow', async (req: Request, res: Response) => {
-    try {
-      const { concept, limit, lang, safe, site } = req.body;
-
-      if (!concept) {
-        return res.status(400).json({ error: 'Concept is required' });
-      }
-
-      const burrowOptions = {
-        ...(limit && { limit }),
-        ...(lang && { lang }),
-        ...(safe && { safe }),
-        ...(site && { site })
-      };
-
-      const result = await burrow(concept, burrowOptions);
-      res.json({ success: true, concept, pages: result });
-    } catch (error) {
-      console.error('Error in /burrow:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-  app.use((req: Request, res: Response) => {
-    res.status(404).json({ error: 'Not Found', path: req.path });
-  });
-
-  app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-    console.error(err);
-    res.status(500).json({ error: 'Internal Server Error' });
-  });
-
-})();
 app.listen(PORT, () => {
   console.log(`Backend listening at http://localhost:${PORT}`);
 });
