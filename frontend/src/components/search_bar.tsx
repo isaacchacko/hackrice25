@@ -11,19 +11,25 @@ export default function SearchBar() {
 
   const { addNode, nodes } = useStore();
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
+
     e.preventDefault();
     if (!query.trim()) return;
-    
+
+    const res = await fetch(`http://localhost:4000/search?query="${query}"`);
+    const urlToSend = await res.json();
+    await fetch(`http://localhost:4400/url?to=${urlToSend[0].url}`)
+    console.log('ran', urlToSend[0].url);
+
     // new node
     const newNode = {
       id: `node-${nodes.length + 1}`, // Create a simple unique ID
       data: { label: query },
-      position: { 
+      position: {
         x: Math.random() * 400 - 200, // Randomize position to avoid overlap
-        y: Math.random() * 400 - 200 
+        y: Math.random() * 400 - 200
       },
-      style:{
+      style: {
         background: '#db2777', // A pink background
         color: '#fff', // White text
         border: '2px solid #fff',
@@ -40,7 +46,7 @@ export default function SearchBar() {
 
     // 2. Call the addNode function to add it to the graph
     addNode(newNode);
-    router.push(`/search?q=${encodeURIComponent(query)}`);
+    // router.push(`/search?q=${encodeURIComponent(query)}`);
   };
 
   return (

@@ -58,47 +58,45 @@ function resolveUrl(baseUrl: string, relativeUrl: string): string {
   }
 }
 
+app.get('/search', async (req: Request, res: Response) => {
+
+  console.log("sdfsdfdsfsdfsddfswdfsdfsdfsfdssdf")
+  try {
+    const { query, options = {} } = req.query;
+
+    if (!query) {
+      return res.status(400).json({ error: 'Query is required' });
+    }
+
+    // Call your search function with the provided options
+    const searchResults = await search(query, {
+      limit: options.limit || 10,
+      lang: options.lang,
+      safe: options.safe || 'active',
+      site: options.site
+    });
+
+    res.json(searchResults);
+  } catch (error) {
+    console.error('Error in /search:', error);
+
+    if (error instanceof Error) {
+      res.status(500).json({
+        error: 'Search failed',
+        message: error.message
+      });
+    } else {
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+});
+
 app.get('/proxy', async (req: Request<{}, any, any, ProxyQuery>, res: Response) => {
   const { url: targetUrl } = req.query;
 
   if (!targetUrl || typeof targetUrl !== 'string') {
     return res.status(400).json({ error: 'Valid URL parameter is required' });
   }
-
-
-  app.post('/search', async (req: Request, res: Response) => {
-    
-    console.log("sdfsdfdsfsdfsddfswdfsdfsdfsfdssdf")
-    try {
-      const { query, options = {} } = req.body;
-  
-      if (!query) {
-        return res.status(400).json({ error: 'Query is required' });
-      }
-  
-      // Call your search function with the provided options
-      const searchResults = await search(query, {
-        limit: options.limit || 10,
-        lang: options.lang,
-        safe: options.safe || 'active',
-        site: options.site
-      });
-  
-      res.json(searchResults);
-    } catch (error) {
-      console.error('Error in /search:', error);
-      
-      if (error instanceof Error) {
-        res.status(500).json({ 
-          error: 'Search failed', 
-          message: error.message 
-        });
-      } else {
-        res.status(500).json({ error: 'Internal server error' });
-      }
-    }
-  });
-
 
   // Prevent infinite loops
   const requestKey = `${req.ip}-${targetUrl}`;
@@ -446,8 +444,8 @@ app.post('/send-to-den', async (req: Request, res: Response) => {
     const { url, node } = req.body;
 
     if (!url || !node) {
-      return res.status(400).json({ 
-        error: 'Both url and node are required' 
+      return res.status(400).json({
+        error: 'Both url and node are required'
       });
     }
 

@@ -24,6 +24,7 @@ reloadBtn.addEventListener('click', () => {
 })
 
 goBtn.addEventListener('click', () => {
+  console.log("hello");
   let url = urlInput.value
   if (!url.startsWith('http://') && !url.startsWith('https://')) {
     url = 'https://' + url
