@@ -3,14 +3,30 @@
 
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import { useStore } from '@/store';
 
 export default function SearchBar() {
   const [query, setQuery] = useState('');
   const router = useRouter();
 
+  const { addNode, nodes } = useStore();
+
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
+    
+    // new node
+    const newNode = {
+      id: `node-${nodes.length + 1}`, // Create a simple unique ID
+      data: { label: query },
+      position: { 
+        x: Math.random() * 400 - 200, // Randomize position to avoid overlap
+        y: Math.random() * 400 - 200 
+      },
+    };
+
+    // 2. Call the addNode function to add it to the graph
+    addNode(newNode);
     router.push(`/search?q=${encodeURIComponent(query)}`);
   };
 
