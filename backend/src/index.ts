@@ -1,9 +1,53 @@
+<<<<<<< Updated upstream
 // ESM + verbatimModuleSyntax
 import dotenv from 'dotenv';
 import express from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import { get_concepts } from './services/get_concepts.js';
 import { get_answer } from './services/get_answer.js';
+// CommonJS imports
+const dotenv = require('dotenv');
+const express = require('express');
+const { make_den_main }Search: (done for terminal)
+Input: query/question
+Output: list of pages/links
+Action: Google Search API
+Burrow:
+Input: Clicking on concept
+Output: Search(new query) -> list of pages/links
+Create Den:
+Input: Act of searching (clicking enter on search or child node)
+Output: List of connecting child nodes and proximity
+Get_concept:
+Input: page
+Output: List of concepts
+Action: API call
+Send_to_Den:
+Input: Page
+Output: Array Den with page appended to it
+Generate_answer:
+Input: pages, concepts, question
+Output: String Answer
+Action: Prompt gemini based off inputs to get a general answer
+Generate_comp_score:
+Input: Node 1 and Node 2
+Output: Score
+Action: Ge = require('./services/make_den_main.js');
+
+// Type definitions
+interface Request {
+  path: string;
+}
+
+interface Response {
+  status: (code: number) => Response;
+  json: (data: any) => void;
+  send: (data: string) => void;
+}
+
+interface NextFunction {
+  (): void;
+}
 
 // Load environment variables from root directory
 dotenv.config({ path: '../.env' });
@@ -36,6 +80,7 @@ app.get('/', (_req: Request, res: Response) => {
     if (conceptsResult.success && conceptsResult.concepts) {
       console.log('✅ Success! Found concepts:');
       conceptsResult.concepts.forEach((concept, index) => {
+      result.concepts.forEach((concept: any, index: number) => {
         console.log(`${index + 1}. ${concept.title}`);
         console.log(`   ${concept.description}\n`);
       });
@@ -110,6 +155,27 @@ app.post('/get-answer', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+// Test the make_den_main function immediately when server starts
+(async () => {
+  console.log('🧪 Testing make_den_main function...');
+  
+  try {
+    const testQuery = 'artificial intelligence machine learning';
+    const result = await make_den_main(testQuery);
+    
+    console.log('📊 Test Results:');
+    console.log('Query:', result.query);
+    console.log('Pages:', result.pages);
+    console.log('Concepts:', result.concepts);
+    console.log('Children:', result.children);
+    
+    console.log('✅ make_den_main test completed successfully!');
+  } catch (error) {
+    console.log('❌ make_den_main test failed:', error);
+  }
+  
+  console.log('🔚 make_den_main test completed\n');
+})();
 
 app.use((req: Request, res: Response) => {
   res.status(404).json({ error: 'Not Found', path: req.path });
