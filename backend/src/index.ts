@@ -5,6 +5,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { get_concepts } from './services/get_concepts.js';
 import { get_answer } from './services/get_answer.js';
 import { make_den_main } from './services/make_den_main.js';
+import { search } from './services/search.js';
 
 // Load environment variables from root directory
 dotenv.config({ path: '../.env' });
@@ -99,6 +100,38 @@ app.get('/', (_req: Request, res: Response) => {
   console.log('🔚 make_den_main test completed\n');
 })();
 
+// Test the search function immediately when server starts
+(async () => {
+  console.log('🧪 Testing search function...');
+  
+  try {
+    const testQuery = 'artificial intelligence machine learning';
+    const result = await search(testQuery, { limit: 3 });
+    
+    console.log('📊 Search Test Results:');
+    console.log('Query:', testQuery);
+    console.log('Pages found:', result.length);
+    
+    if (result.length > 0) {
+      console.log('✅ Success! Found pages:');
+      result.forEach((page, index) => {
+        console.log(`${index + 1}. ${page.title ?? '(no title)'}`);
+        console.log(`   ${page.url}`);
+        if (page.snippet) console.log(`   ${page.snippet}`);
+        console.log('');
+      });
+    } else {
+      console.log('❌ No pages found');
+    }
+    
+    console.log('✅ search test completed successfully!');
+  } catch (error) {
+    console.log('❌ search test failed:', error);
+  }
+  
+  console.log('🔚 search test completed\n');
+})();
+
 // API endpoints for testing the functions
 app.post('/get-concepts', async (req: Request, res: Response) => {
   try {
@@ -146,6 +179,29 @@ app.post('/make-den-main', async (req: Request, res: Response) => {
     res.json(result);
   } catch (error) {
     console.error('Error in /make-den-main:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/search', async (req: Request, res: Response) => {
+  try {
+    const { query, limit, lang, safe, site } = req.body;
+    
+    if (!query) {
+      return res.status(400).json({ error: 'Query is required' });
+    }
+    
+    const searchOptions = {
+      ...(limit && { limit }),
+      ...(lang && { lang }),
+      ...(safe && { safe }),
+      ...(site && { site })
+    };
+    
+    const result = await search(query, searchOptions);
+    res.json({ success: true, pages: result });
+  } catch (error) {
+    console.error('Error in /search:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
