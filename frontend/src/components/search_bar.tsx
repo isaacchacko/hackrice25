@@ -15,8 +15,7 @@ export default function SearchBar() {
     e.preventDefault();
     if (!query.trim()) return;
 
-<<<<<<< HEAD
-=======
+
     // Original search functionality - opens link automatically
     const res = await fetch(`http://localhost:4000/search?query="${query}"`);
     const urlToSend = await res.json();
@@ -29,7 +28,7 @@ export default function SearchBar() {
     console.log('ran', urlToSend[0].url);
 
     // ONLY ADD: Create den for this search query
->>>>>>> 49f9c42 (graph toggling)
+
     try {
       console.log('🎯 Creating hop session for search query:', query);
       

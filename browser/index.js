@@ -12,7 +12,6 @@ let currentDenData = null;
 const fs = require('fs');
 const path = require('path');
 
-let win;
 let lastUrl;
 
 function createWindow() {
