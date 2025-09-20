@@ -59,7 +59,6 @@ function resolveUrl(baseUrl: string, relativeUrl: string): string {
 }
 
 app.get('/search', async (req: Request, res: Response) => {
-
   console.log("sdfsdfdsfsdfsddfswdfsdfsdfsfdssdf")
   try {
     const { query, options = {} } = req.query;
@@ -347,6 +346,23 @@ app.get('/proxy', async (req: Request<{}, any, any, ProxyQuery>, res: Response) 
 
 app.get('/', (_req: Request, res: Response) => {
   res.send('Backend up');
+});
+
+// Separate endpoint for make_den_main
+app.get('/make-den-main', async (req: Request, res: Response) => {
+  try {
+    const { query } = req.query;
+
+    if (!query) {
+      return res.status(400).json({ error: 'Query is required' });
+    }
+
+    const denData = await make_den_main(query);
+    res.json(denData);
+  } catch (error) {
+    console.error('Error in /make-den-main:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // API endpoints for testing the functions

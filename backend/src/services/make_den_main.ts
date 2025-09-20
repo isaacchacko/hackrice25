@@ -33,6 +33,14 @@ export async function make_den_main(query: string): Promise<DenMainResponse> {
       children: []
     };
 
+    // Console logging as requested
+    console.log(`🏠 Den for "${query.trim()}" has been made`);
+    console.log('📊 Den contents:');
+    console.log('  - Query:', response.query);
+    console.log('  - Pages array:', response.pages, `(length: ${response.pages.length})`);
+    console.log('  - ConceptList array:', response.conceptList, `(length: ${response.conceptList.length})`);
+    console.log('  - Children array:', response.children, `(length: ${response.children.length})`);
+
     return response;
 
   } catch (error) {

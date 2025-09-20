@@ -12,26 +12,38 @@ export default function SearchBar() {
   const { addNode, nodes } = useStore();
 
   const handleSubmit = async (e: FormEvent) => {
-
     e.preventDefault();
     if (!query.trim()) return;
 
+    // Original search functionality - opens link automatically
     const res = await fetch(`http://localhost:4000/search?query="${query}"`);
     const urlToSend = await res.json();
     await fetch(`http://localhost:4400/url?to=${urlToSend[0].url}`)
     console.log('ran', urlToSend[0].url);
 
-    // new node
+    // ONLY ADD: Create den for this search query
+    try {
+      console.log('🏠 Creating den for search query:', query);
+      const denResponse = await fetch(`http://localhost:4000/make-den-main?query=${encodeURIComponent(query)}`);
+      if (denResponse.ok) {
+        const denData = await denResponse.json();
+        console.log('🏠 Den created successfully:', denData);
+      }
+    } catch (denError) {
+      console.error('❌ Failed to create den:', denError);
+    }
+
+    // Original node creation
     const newNode = {
-      id: `node-${nodes.length + 1}`, // Create a simple unique ID
+      id: `node-${nodes.length + 1}`,
       data: { label: query },
       position: {
-        x: Math.random() * 400 - 200, // Randomize position to avoid overlap
+        x: Math.random() * 400 - 200,
         y: Math.random() * 400 - 200
       },
       style: {
-        background: '#db2777', // A pink background
-        color: '#fff', // White text
+        background: '#db2777',
+        color: '#fff',
         border: '2px solid #fff',
         width: 100,
         height: 100,
@@ -39,14 +51,12 @@ export default function SearchBar() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        textAlign: 'center',
+        textAlign: 'center' as const,
         padding: '5px'
       }
     };
 
-    // 2. Call the addNode function to add it to the graph
     addNode(newNode);
-    // router.push(`/search?q=${encodeURIComponent(query)}`);
   };
 
   return (
