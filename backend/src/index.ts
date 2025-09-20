@@ -6,6 +6,7 @@ import { get_concepts } from './services/get_concepts.js';
 import { get_answer } from './services/get_answer.js';
 import { make_den_main } from './services/make_den_main.js';
 import { search } from './services/search.js';
+import { simplify_concepts } from './services/simplify_concepts.js';
 
 // Load environment variables from root directory
 dotenv.config({ path: '../.env' });
@@ -42,34 +43,75 @@ app.get('/', (_req: Request, res: Response) => {
         console.log(`   ${concept.description}\n`);
       });
 
-      // Now test get_answer using the concepts we just extracted
-      console.log('🧪 Testing get_answer function...');
+      // Test simplify_concepts with the extracted concepts plus some duplicates
+      console.log('🧪 Testing simplify_concepts function...');
       
-      const testUrls = [
-        'https://en.wikipedia.org/wiki/Artificial_intelligence',
-        'https://en.wikipedia.org/wiki/Machine_learning'
+      // Create some duplicate concepts to test the simplification
+      const testConceptsWithDuplicates = [
+        ...conceptsResult.concepts,
+        {
+          title: "AI",
+          description: "Artificial intelligence systems that can perform human-like tasks."
+        },
+        {
+          title: "Machine Intelligence",
+          description: "Computer systems capable of learning and reasoning."
+        }
       ];
+
+      console.log('📊 Original concepts before simplification:');
+      console.log('Total count:', testConceptsWithDuplicates.length);
+      testConceptsWithDuplicates.forEach((concept, index) => {
+        console.log(`${index + 1}. ${concept.title}`);
+        console.log(`   ${concept.description}\n`);
+      });
+
+      const simplifyResult = await simplify_concepts(testConceptsWithDuplicates);
       
-      const testQuestion = 'What are the main applications and benefits of artificial intelligence?';
+      console.log('📊 simplify_concepts Test Results:');
       
-      const answerResult = await get_answer(testUrls, conceptsResult.concepts, testQuestion);
-      
-      console.log('📊 get_answer Test Results:');
-      console.log('URLs:', testUrls);
-      console.log('Question:', testQuestion);
-      console.log('Concepts used:', conceptsResult.concepts.length);
-      
-      if (answerResult.success && answerResult.answer) {
-        console.log('✅ Success! Generated answer:');
-        console.log('Answer:', answerResult.answer);
-        console.log('\n📚 Short Version:', answerResult.shortAnswer);
+      if (simplifyResult.success && simplifyResult.concepts) {
+        console.log('✅ Success! Simplified concepts:');
+        console.log('Final concepts count:', simplifyResult.concepts.length);
+        console.log('Concepts removed:', simplifyResult.removed_count);
+        
+        simplifyResult.concepts.forEach((concept, index) => {
+          console.log(`${index + 1}. ${concept.title}`);
+          console.log(`   ${concept.description}\n`);
+        });
+
+        // Now test get_answer using the simplified concepts
+        console.log('🧪 Testing get_answer function with simplified concepts...');
+        
+        const testUrls = [
+          'https://en.wikipedia.org/wiki/Artificial_intelligence',
+          'https://en.wikipedia.org/wiki/Machine_learning'
+        ];
+        
+        const testQuestion = 'What are the main applications and benefits of artificial intelligence?';
+        
+        const answerResult = await get_answer(testUrls, simplifyResult.concepts, testQuestion);
+        
+        console.log('📊 get_answer Test Results:');
+        console.log('URLs:', testUrls);
+        console.log('Question:', testQuestion);
+        console.log('Simplified concepts used:', simplifyResult.concepts.length);
+        
+        if (answerResult.success && answerResult.answer) {
+          console.log('✅ Success! Generated answer:');
+          console.log('Answer:', answerResult.answer);
+          console.log('\n📚 Short Version:', answerResult.shortAnswer);
+        } else {
+          console.log('❌ get_answer Error:', answerResult.error);
+        }
+        
       } else {
-        console.log('❌ get_answer Error:', answerResult.error);
+        console.log('❌ simplify_concepts Error:', simplifyResult.error);
       }
       
     } else {
       console.log('❌ get_concepts Error:', conceptsResult.error);
-      console.log('⏭️ Skipping get_answer test due to get_concepts failure');
+      console.log('⏭️ Skipping subsequent tests due to get_concepts failure');
     }
   } catch (error) {
     console.log('💥 Test failed:', error);
@@ -163,6 +205,22 @@ app.post('/get-answer', async (req: Request, res: Response) => {
     res.json(result);
   } catch (error) {
     console.error('Error in /get-answer:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/simplify-concepts', async (req: Request, res: Response) => {
+  try {
+    const { concepts } = req.body;
+    
+    if (!concepts || !Array.isArray(concepts)) {
+      return res.status(400).json({ error: 'concepts array is required' });
+    }
+    
+    const result = await simplify_concepts(concepts);
+    res.json(result);
+  } catch (error) {
+    console.error('Error in /simplify-concepts:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
