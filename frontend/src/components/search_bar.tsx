@@ -14,16 +14,16 @@ export default function SearchBar() {
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
-    
+
     // new node
     const newNode = {
       id: `node-${nodes.length + 1}`, // Create a simple unique ID
       data: { label: query },
-      position: { 
+      position: {
         x: Math.random() * 400 - 200, // Randomize position to avoid overlap
-        y: Math.random() * 400 - 200 
+        y: Math.random() * 400 - 200
       },
-      style:{
+      style: {
         background: '#db2777', // A pink background
         color: '#fff', // White text
         border: '2px solid #fff',
@@ -55,9 +55,10 @@ export default function SearchBar() {
       <button
         type="submit"
         className="bg-pink-600 hover:bg-pink-700 text-white font-bold py-3 px-6 rounded-r-md"
+        onClick={() => window.electronAPI.send('custom-channel', { message: 'Hello from Next.js & TypeScript!' })}
       >
         Search
       </button>
-    </form>
+    </form >
   );
 }
