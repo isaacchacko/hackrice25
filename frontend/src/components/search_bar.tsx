@@ -23,6 +23,19 @@ export default function SearchBar() {
         x: Math.random() * 400 - 200, // Randomize position to avoid overlap
         y: Math.random() * 400 - 200 
       },
+      style:{
+        background: '#db2777', // A pink background
+        color: '#fff', // White text
+        border: '2px solid #fff',
+        width: 100,
+        height: 100,
+        borderRadius: '50%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        textAlign: 'center',
+        padding: '5px'
+      }
     };
 
     // 2. Call the addNode function to add it to the graph
