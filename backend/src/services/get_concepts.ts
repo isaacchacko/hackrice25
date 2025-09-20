@@ -85,7 +85,7 @@ async function callGeminiAPI(content: string): Promise<string> {
   For each concept, provide:
   1. A clear, concise title (2-5 words)
   2. A brief description (1-2 sentences)
-  3. A relevance score from 1-10 (10 being most relevant)
+
   
   Return the response in valid JSON format like this:
   {
