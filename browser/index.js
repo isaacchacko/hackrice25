@@ -8,6 +8,8 @@ const fetch = require('node-fetch')
 let win;
 // Global variable to store current hop session
 let currentHopSession = null;
+// Global variable to store current den data
+let currentDenData = null;
 
 function createWindow() {
   win = new BrowserWindow({
@@ -42,6 +44,7 @@ server.use(cors({
 server.get('/url', (req, res) => {
   const url = req.query.to;
   const hopSessionId = req.query.hopSessionId;
+  const denData = req.query.denData;
   
   if (url && win) {
     win.loadURL(url); // This navigates the Electron window!
@@ -50,6 +53,18 @@ server.get('/url', (req, res) => {
     if (hopSessionId) {
       currentHopSession = hopSessionId;
       console.log('🎯 Hop session set from URL request:', hopSessionId);
+    }
+    
+    // Set the den data if provided
+    if (denData) {
+      try {
+        currentDenData = JSON.parse(denData);
+        console.log('🏠 Den data set from URL request:', currentDenData.query);
+        console.log('📊 Den pages count:', currentDenData.pages?.length || 0);
+        console.log('📊 Den concepts count:', currentDenData.conceptList?.length || 0);
+      } catch (err) {
+        console.warn('Could not parse den data:', err);
+      }
     }
     
     res.send(`Navigated Electron window to: ${url}`);
@@ -83,31 +98,19 @@ app.whenReady().then(() => {
     console.log('📤 Current URL:', currentUrl);
     
     try {
-      // First, get the most recent den from the frontend
-      // We'll use a simple approach: get the most recent den from the backend
-      // In a real implementation, you might want to store this in a global variable
-      // or get it from the frontend via IPC
+      let denData = currentDenData;
       
-      // For now, let's create a simple den or use a default one
-      const denQuery = "electron-browser-pages"; // Default query for browser pages
-      
-      // Create or get a den for browser pages
-      let denResponse = await fetch(`http://localhost:4000/make-den-main?query=${encodeURIComponent(denQuery)}`);
-      let denData = null;
-      
-      if (denResponse.ok) {
-        denData = await denResponse.json();
-        console.log('🏠 Using den for browser pages:', denData);
-      } else {
-        // Fallback: create a simple den structure
-        denData = {
-          query: denQuery,
-          pages: [],
-          conceptList: [],
-          children: []
-        };
-        console.log('🏠 Created fallback den for browser pages');
+      // If no den data exists, we can't proceed
+      if (!denData) {
+        console.log('❌ No den data available. Please search first to create a den.');
+        console.log('💡 Tip: Search for something in the frontend to create a den, then use Ctrl+D on the results.');
+        return;
       }
+      
+      console.log('🏠 Using existing den for query:', denData.query);
+      console.log('📊 Den BEFORE processing:');
+      console.log('  - Pages:', denData.pages?.length || 0);
+      console.log('  - Concepts:', denData.conceptList?.length || 0);
       
       // Send the current page to the den via the backend
       const response = await fetch('http://localhost:4000/send-to-den', {
@@ -131,6 +134,10 @@ app.whenReady().then(() => {
         console.log('📈 Statistics:');
         console.log('  - Concepts added:', result.concepts_added);
         console.log('  - Concepts removed:', result.concepts_removed);
+        
+        // Update the stored den data with the new data
+        currentDenData = result.node;
+        console.log('🔄 Updated stored den data');
       } else {
         console.error('❌ Failed to send page to den:', response.status);
       }

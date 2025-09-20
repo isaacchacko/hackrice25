@@ -39,30 +39,32 @@ export default function SearchBar() {
       console.log('  - Total pages:', hopData.hopState.pages.length);
       console.log('  - Current page:', hopData.currentPage.url);
 
-      // Open the first page in the hop session
-      const firstPageUrl = hopData.currentPage.url;
-      await fetch(`http://localhost:4400/url?to=${firstPageUrl}&hopSessionId=${hopData.sessionId}`);
-      console.log('🌐 Opened first page:', firstPageUrl);
-      console.log('🎯 Set hop session ID:', hopData.sessionId);
-
-      // Create den for this search query (keeping existing functionality)
-      let denData = null;
+      // Create den for this search query first
+      let searchDenData = null;
       try {
         console.log('🏠 Creating den for search query:', query);
         const denResponse = await fetch(`http://localhost:4000/make-den-main?query=${encodeURIComponent(query)}`);
         if (denResponse.ok) {
-          denData = await denResponse.json();
-          console.log('🏠 Den created successfully:', denData);
+          searchDenData = await denResponse.json();
+          console.log('🏠 Den created successfully:', searchDenData);
           console.log('🏠 Den data structure:', {
-            query: denData.query,
-            pages: denData.pages,
-            conceptList: denData.conceptList,
-            children: denData.children
+            query: searchDenData.query,
+            pages: searchDenData.pages,
+            conceptList: searchDenData.conceptList,
+            children: searchDenData.children
           });
         }
       } catch (denError) {
         console.error('❌ Failed to create den:', denError);
       }
+
+      // Open the first page in the hop session
+      const firstPageUrl = hopData.currentPage.url;
+      const denDataParam = searchDenData ? encodeURIComponent(JSON.stringify(searchDenData)) : '';
+      await fetch(`http://localhost:4400/url?to=${firstPageUrl}&hopSessionId=${hopData.sessionId}&denData=${denDataParam}`);
+      console.log('🌐 Opened first page:', firstPageUrl);
+      console.log('🎯 Set hop session ID:', hopData.sessionId);
+      console.log('🏠 Set den data for query:', searchDenData?.query);
 
       // Create node with both hop and den data
       const newNode = {
@@ -70,7 +72,7 @@ export default function SearchBar() {
         data: { 
           label: query,
           type: 'search',
-          denData: denData,
+          denData: searchDenData,
           hopSessionId: hopData.sessionId,
           hopData: hopData.hopState
         },
