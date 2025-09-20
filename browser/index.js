@@ -11,7 +11,10 @@ function createWindow() {
       contextIsolation: true,
       webSecurity: false,  // Add this - crucial for loading localhost
       allowRunningInsecureContent: true // Add this too
-    }
+    },
+    menu: null, 
+    frame: false,
+    titleBarStyle: 'hidden',
   })
 
   win.loadFile('index.html')
