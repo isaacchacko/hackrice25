@@ -3,12 +3,13 @@ import dotenv from 'dotenv';
 import express from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import { get_concepts } from './services/get_concepts.js';
-import { get_comparisonScore } from './services/get_comparisonScore.js';
 import { get_answer } from './services/get_answer.js';
 import { make_den_main } from './services/make_den_main.js';
 import { simplify_concepts } from './services/simplify_concepts.js';
 import { search } from './services/search.js';
 import { burrow } from './services/burrow.js';
+import { get_comparisonScore } from './services/get_comparisonScore.js';
+import { sendToDen } from './services/send_toDen.js';
 
 // Load environment variables from root directory
 dotenv.config({ path: '../.env' });
@@ -133,7 +134,7 @@ app.get('/', (_req: Request, res: Response) => {
     console.log('📊 Test Results:');
     console.log('Query:', result.query);
     console.log('Pages:', result.pages);
-    console.log('Concepts:', result.concepts);
+    console.log('Concepts:', result.conceptList);
     console.log('Children:', result.children);
     
     console.log('✅ make_den_main test completed successfully!');
@@ -171,6 +172,60 @@ app.get('/', (_req: Request, res: Response) => {
   }
   
   console.log('🔚 burrow test completed\n');
+// Test the sendToDen function immediately when server starts
+(async () => {
+  console.log('🧪 Testing sendToDen function...');
+  
+  try {
+    // Use the parentNode from make_den_main test
+    const testQuery = 'artificial intelligence machine learning';
+    const parentNode = await make_den_main(testQuery);
+    
+    console.log('📊 ParentNode BEFORE sendToDen:');
+    console.log('Query:', parentNode.query);
+    console.log('Pages count:', parentNode.pages.length);
+    console.log('Pages:', parentNode.pages);
+    console.log('Concepts count:', parentNode.conceptList.length);
+    console.log('Concepts:');
+    parentNode.conceptList.forEach((concept, index) => {
+      console.log(`  ${index + 1}. ${concept.title}: ${concept.description}`);
+    });
+    console.log('Children count:', parentNode.children.length);
+    console.log('');
+
+    // Test sendToDen with a new URL
+    const testUrl = 'https://en.wikipedia.org/wiki/Machine_learning';
+    console.log(`📤 Sending to den: ${testUrl}`);
+    
+    const result = await sendToDen(testUrl, parentNode);
+    
+    console.log('📊 SendToDen Results:');
+    if (result.success) {
+      console.log('✅ Success!');
+      console.log('Concepts added:', result.concepts_added);
+      console.log('Concepts removed during simplification:', result.concepts_removed);
+    } else {
+      console.log('❌ Error:', result.error);
+    }
+    
+    console.log('');
+    console.log('📊 ParentNode AFTER sendToDen:');
+    console.log('Query:', parentNode.query);
+    console.log('Pages count:', parentNode.pages.length);
+    console.log('Pages:', parentNode.pages);
+    console.log('Concepts count:', parentNode.conceptList.length);
+    console.log('Concepts:');
+    parentNode.conceptList.forEach((concept, index) => {
+      console.log(`  ${index + 1}. ${concept.title}: ${concept.description}`);
+    });
+    console.log('Children count:', parentNode.children.length);
+    
+    console.log('✅ sendToDen test completed successfully!');
+  } catch (error) {
+    console.log('❌ sendToDen test failed:', error);
+  }
+  
+  console.log('🔚 sendToDen test completed\n');
 })();
 
 // Test the get_comparisonScore function immediately when server starts

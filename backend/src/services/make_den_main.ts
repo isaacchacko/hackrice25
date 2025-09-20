@@ -1,10 +1,5 @@
 // backend/src/services/make_den_main.ts
 
-interface Page {
-  url: string;
-  title?: string;
-  snippet?: string;
-}
 
 interface Concept {
   title: string;
@@ -13,8 +8,8 @@ interface Concept {
 
 interface DenMainResponse {
   query: string;
-  pages: Page[];
-  concepts: Concept[];
+  pages: string[];
+  conceptList: Concept[];
   children: any[];
 }
 
@@ -34,7 +29,7 @@ export async function make_den_main(query: string): Promise<DenMainResponse> {
     const response: DenMainResponse = {
       query: query.trim(),
       pages: [],
-      concepts: [],
+      conceptList: [],
       children: []
     };
 
@@ -55,7 +50,7 @@ export async function testMakeDenMain() {
     console.log('Test Results for make_den_main:');
     console.log('Query:', result.query);
     console.log('Pages:', result.pages);
-    console.log('Concepts:', result.concepts);
+    console.log('Concepts:', result.conceptList);
     console.log('Children:', result.children);
   } catch (error) {
     console.error('Test failed:', error);
