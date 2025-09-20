@@ -12,12 +12,16 @@
     "build": "turbo run build",
     "lint": "turbo run lint",
     "test": "turbo run test",
-    "clean": "turbo run clean"
+    "clean": "turbo run clean",
+    "test:search": "ts-node --project tsconfig.cjs.json --transpile-only backend/test-search.ts"
   },
   "devDependencies": {
-    "turbo": "^2.5.6"
+    "ts-node": "^10.9.2",
+    "turbo": "^2.5.6",
+    "typescript": "^5.9.2"
   },
   "dependencies": {
+    "dotenv": "^17.2.2",
     "tsx": "^4.20.5"
   }
 }
