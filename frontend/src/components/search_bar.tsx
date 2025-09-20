@@ -126,7 +126,7 @@ export default function SearchBar() {
     }
   };
 
-  return (
+ return (
     <form onSubmit={handleSubmit} className="w-full flex">
       <input
         type="text"

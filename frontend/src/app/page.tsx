@@ -6,20 +6,20 @@ export default function Home() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen w-full bg-black p-8">
       {/* New Flex Container for Image and Title */}
-      <div className="flex items-center mb-12 gap-8">
+      <div className="flex items-center mb-6 gap-6">
         <Image
           src="/images/white lines.png"
           alt="A small rabbit mascot"
           width={200}
           height={200}
-          className="w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 lg:w-48 lg:h-48 xl:w-56 xl:h-56 2xl:w-64 2xl:h-64"
+          className="w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 lg:w-40 lg:h-40 xl:w-44 xl:h-44 2xl:w-48 2xl:h-48"
         />
-        <h1 className="text-6xl sm:text-7xl md:text-8xl lg:text-9xl xl:text-[10rem] 2xl:text-[12rem] font-extrabold text-pink-500">
+        <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl xl:text-[8rem] 2xl:text-[9rem] font-extrabold text-pink-500">
           rabbit
         </h1>
       </div>
 
-      <p className="text-slate-400 mb-16 text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl text-center px-8">
+      <p className="text-slate-400 mb-8 text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl text-center px-8">
         Your journey of discovery starts here. Start burrowing.
       </p>
       
