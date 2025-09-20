@@ -1,4 +1,3 @@
-
 const { app, BrowserWindow } = require('electron')
 const path = require('path')
 
@@ -10,19 +9,16 @@ function createWindow() {
       webviewTag: true,
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js')
-    },
-    frame: false,
-    menu: null,
+      webSecurity: false,  // Add this - crucial for loading localhost
+      allowRunningInsecureContent: true // Add this too
+    }
   })
 
   win.loadFile('index.html')
+  
+  // Open DevTools to see what's happening
+  win.webContents.openDevTools()
 }
-
-// allow for localhost usage
-app.commandLine.appendSwitch('--allow-running-insecure-content')
-app.commandLine.appendSwitch('--allow-insecure-localhost', 'true')
-app.commandLine.appendSwitch('--ignore-ssl-errors')
 
 app.whenReady().then(createWindow)
 
