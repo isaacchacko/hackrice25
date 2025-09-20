@@ -7,6 +7,7 @@ import { get_comparisonScore } from './services/get_comparisonScore.js';
 import { get_answer } from './services/get_answer.js';
 import { make_den_main } from './services/make_den_main.js';
 import { simplify_concepts } from './services/simplify_concepts.js';
+import { search } from './services/search.js';
 
 // Load environment variables from root directory
 dotenv.config({ path: '../.env' });

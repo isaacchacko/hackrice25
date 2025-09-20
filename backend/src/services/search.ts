@@ -98,15 +98,7 @@ async function googleCSE(query: string, opts: GoogleCSEOpts): Promise<Page[]> {
       if (!link || seen.has(link)) continue;
       seen.add(link);
 
-      const titleRaw = (it.title ?? "").trim();
-      const snippetRaw =
-        it.snippet ?? it.snippetText ?? it.htmlSnippet ?? "";
-
       const page: Page = { url: link };
-      if (titleRaw) page.title = titleRaw; // omit if falsy
-      const norm = normalizeSnippet(snippetRaw);
-      if (norm) page.snippet = norm; // omit if falsy
-
       pages.push(page);
       fetched++;
       if (fetched >= opts.limit) break;
@@ -160,14 +152,7 @@ async function serper(query: string, opts: SerperOpts): Promise<Page[]> {
     if (!link || seen.has(link)) continue;
     seen.add(link);
 
-    const titleRaw = (it.title ?? "").trim();
-    const snippetRaw = it.snippet ?? it.snippet_text ?? it.description ?? "";
-
     const page: Page = { url: link };
-    if (titleRaw) page.title = titleRaw;
-    const norm = normalizeSnippet(snippetRaw);
-    if (norm) page.snippet = norm;
-
     pages.push(page);
     if (pages.length >= opts.limit) break;
   }
@@ -176,12 +161,6 @@ async function serper(query: string, opts: SerperOpts): Promise<Page[]> {
 }
 
 // ---------------- Utilities ----------------
-
-function normalizeSnippet(s?: string): string | undefined {
-  if (!s) return undefined;
-  const trimmed = s.replace(/\s+/g, " ").trim();
-  return trimmed || undefined;
-}
 
 async function safeText(res: Response) {
   try {
