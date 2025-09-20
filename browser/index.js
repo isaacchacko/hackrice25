@@ -11,7 +11,10 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js')
-    }
+    },
+    frame: false,
+    titleBarStyle: 'hidden',
+    menu: null,
   })
 
   win.loadFile('index.html')

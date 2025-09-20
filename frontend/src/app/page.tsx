@@ -4,7 +4,7 @@ import SearchBar from "@/components/search_bar";
 
 export default function Home() {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[80vh]">
+    <div className="flex flex-col items-center justify-center h-screen w-screen bg-black">
       
       {/* New Flex Container for Image and Title */}
       <div className="flex items-center mb-4"> {/* Use flex to align items horizontally */}
