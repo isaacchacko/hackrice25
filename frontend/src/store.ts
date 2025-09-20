@@ -10,6 +10,7 @@ type RFState = {
   onEdgesChange: OnEdgesChange;
   addNode: (newNode: Node) => void;
   toggleGraphVisibility: () => void;
+  clearGraph: () => void; // <-- 1. Make sure it's in the type definition
 };
 
 export const useStore = create<RFState>((set, get) => ({
@@ -20,10 +21,10 @@ export const useStore = create<RFState>((set, get) => ({
   onNodesChange: (changes) => set({ nodes: applyNodeChanges(changes, get().nodes) }),
   onEdgesChange: (changes) => set({ edges: applyEdgeChanges(changes, get().edges) }),
   addNode: (newNode) => set({ nodes: [...get().nodes, newNode] }),
+  toggleGraphVisibility: () => set({ isGraphVisible: !get().isGraphVisible }),
 
-  toggleGraphVisibility: () => {
-    const currentState = get().isGraphVisible;
-    console.log(`[STORE] Toggling visibility. Current state: ${currentState}, New state: ${!currentState}`);
-    set({ isGraphVisible: !currentState });
+  // <-- 2. Make sure the function is implemented here
+  clearGraph: () => {
+    set({ nodes: [], edges: [] });
   },
 }));
