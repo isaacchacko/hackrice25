@@ -2,6 +2,7 @@ const { app, BrowserWindow } = require('electron')
 const path = require('path')
 const express = require('express');
 const cors = require('cors');
+const { dialog, globalShortcut } = require('electron/main')
 
 let win;
 
@@ -55,6 +56,11 @@ app.commandLine.appendSwitch('--allow-insecure-localhost', 'true')
 app.commandLine.appendSwitch('--ignore-ssl-errors')
 
 app.whenReady().then(() => {
+
+  globalShortcut.register('CommandOrControl+W', () => {
+    console.log('yes!!');
+    win.loadURL('http://localhost:3000'); // This navigates the Electron window!
+  })
   createWindow();
 })
 

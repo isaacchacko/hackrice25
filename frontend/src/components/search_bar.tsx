@@ -4,6 +4,7 @@
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/store';
+import { url } from 'inspector';
 
 export default function SearchBar() {
   const [query, setQuery] = useState('');
@@ -18,6 +19,7 @@ export default function SearchBar() {
     // Original search functionality - opens link automatically
     const res = await fetch(`http://localhost:4000/search?query="${query}"`);
     const urlToSend = await res.json();
+    console.log(urlToSend);
     await fetch(`http://localhost:4400/url?to=${urlToSend[0].url}`)
     console.log('ran', urlToSend[0].url);
 
