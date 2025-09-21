@@ -1,8 +1,70 @@
 // backend/src/services/search.ts
 import dotenv from 'dotenv';
+import type { bigDaddyNode, concept } from '../types/den.js';
 
 // Load environment variables
 dotenv.config({ path: '../.env' });
+
+// Global state management for the central knowledge graph
+let centralBigDaddyNode: bigDaddyNode | null = null;
+let currentHopSession: string | null = null;
+let currentFocusNode: bigDaddyNode | null = null;
+
+// Global state getters and setters
+export function getCentralBigDaddyNode(): bigDaddyNode | null {
+  return centralBigDaddyNode;
+}
+
+export function setCentralBigDaddyNode(node: bigDaddyNode | null): void {
+  centralBigDaddyNode = node;
+  // When setting the central node, also set it as the focus node
+  currentFocusNode = node;
+  console.log('🏠 Central bigDaddyNode set:', node?.query || 'null');
+  console.log('🎯 Focus node set to central bigDaddyNode');
+}
+
+export function getCurrentHopSession(): string | null {
+  return currentHopSession;
+}
+
+export function setCurrentHopSession(sessionId: string | null): void {
+  currentHopSession = sessionId;
+  console.log('🎯 Hop session set:', sessionId || 'null');
+}
+
+export function getCurrentFocusNode(): bigDaddyNode | null {
+  return currentFocusNode;
+}
+
+export function setCurrentFocusNode(node: bigDaddyNode | null): void {
+  currentFocusNode = node;
+  console.log('🎯 Focus node set:', node?.query || 'null');
+}
+
+// Function to create a new central bigDaddyNode from search results
+export function createCentralBigDaddyNode(query: string, pages: Page[]): bigDaddyNode {
+  const bigDaddyNode: bigDaddyNode = {
+    query: query,
+    pages: pages.map(page => page.url),
+    conceptList: [], // Will be populated by other services
+    children: [], // Will be populated by other services
+    answer: "" // Will be populated by other services
+  };
+  
+  setCentralBigDaddyNode(bigDaddyNode);
+  return bigDaddyNode;
+}
+
+// Function to get or create the central bigDaddyNode
+export function getOrCreateCentralBigDaddyNode(query: string, pages: Page[]): bigDaddyNode {
+  if (centralBigDaddyNode) {
+    console.log('🏠 Using existing central bigDaddyNode:', centralBigDaddyNode.query);
+    return centralBigDaddyNode;
+  }
+  
+  console.log('🏠 Creating new central bigDaddyNode for query:', query);
+  return createCentralBigDaddyNode(query, pages);
+}
 
 export type Page = {
   url: string;
@@ -56,6 +118,38 @@ export async function search(query: string, opts: SearchOptions = {}): Promise<P
   throw new Error(
     "search(): No search provider configured. Set GOOGLE_API_KEY + GOOGLE_CSE_ID or SERPER_API_KEY",
   );
+}
+
+// Enhanced search function that creates and manages the central bigDaddyNode
+export async function searchWithCentralNode(query: string, opts: SearchOptions = {}): Promise<{
+  pages: Page[];
+  centralNode: bigDaddyNode;
+  hopSessionId: string;
+}> {
+  console.log('🔍 Starting enhanced search with central node management');
+  
+  // Perform the search
+  const pages = await search(query, opts);
+  console.log(`📄 Found ${pages.length} search results`);
+  
+  // Create or get the central bigDaddyNode
+  const centralNode = getOrCreateCentralBigDaddyNode(query, pages);
+  
+  // Generate a hop session ID (simple timestamp-based for now)
+  const hopSessionId = `hop_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  setCurrentHopSession(hopSessionId);
+  
+  console.log('✅ Enhanced search completed:');
+  console.log('  - Query:', centralNode.query);
+  console.log('  - Pages:', centralNode.pages.length);
+  console.log('  - Hop Session:', hopSessionId);
+  console.log('  - Focus Node:', currentFocusNode?.query || 'null');
+  
+  return {
+    pages,
+    centralNode,
+    hopSessionId
+  };
 }
 
 // ---------------- Google CSE ----------------

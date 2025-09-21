@@ -6,7 +6,7 @@ import { get_concepts } from './services/get_concepts.js';
 import { get_answer } from './services/get_answer.js';
 import { make_den_main } from './services/make_den_main.js';
 import { simplify_concepts } from './services/simplify_concepts.js';
-import { search } from './services/search.js';
+import { search, searchWithCentralNode, getCentralBigDaddyNode, getCurrentHopSession, getCurrentFocusNode } from './services/search.js';
 import { burrow } from './services/burrow.js';
 import { get_comparisonScore } from './services/get_comparisonScore.js';
 import { sendToDen } from './services/send_toDen.js';
@@ -85,15 +85,20 @@ app.get('/search', async (req: Request, res: Response) => {
       }
     }
 
-    // Call your search function with the provided options
-    const searchResults = await search(query, {
+    // Call the enhanced search function with central node management
+    const searchResult = await searchWithCentralNode(query, {
       limit: searchOptions.limit || 10,
       lang: searchOptions.lang,
       safe: searchOptions.safe || 'active',
       site: searchOptions.site
     });
 
-    res.json(searchResults);
+    // Return both the search results and the central node information
+    res.json({
+      pages: searchResult.pages,
+      centralNode: searchResult.centralNode,
+      hopSessionId: searchResult.hopSessionId
+    });
   } catch (error) {
     console.error('Error in /search:', error);
 
@@ -105,6 +110,31 @@ app.get('/search', async (req: Request, res: Response) => {
     } else {
       res.status(500).json({ error: 'Internal server error' });
     }
+  }
+});
+
+// New endpoint to get the current central node state
+app.get('/central-node-state', (req: Request, res: Response) => {
+  try {
+    const centralNode = getCentralBigDaddyNode();
+    const hopSession = getCurrentHopSession();
+    const focusNode = getCurrentFocusNode();
+    
+    res.json({
+      success: true,
+      centralNode: centralNode,
+      hopSession: hopSession,
+      focusNode: focusNode,
+      hasCentralNode: centralNode !== null,
+      hasHopSession: hopSession !== null,
+      hasFocusNode: focusNode !== null
+    });
+  } catch (error) {
+    console.error('Error getting central node state:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to get central node state' 
+    });
   }
 });
 

@@ -15,24 +15,25 @@ export default function SearchBar() {
     e.preventDefault();
     if (!query.trim()) return;
 
-
-    // Original search functionality - opens link automatically
-    const res = await fetch(`http://localhost:4000/search?query="${query}"`);
-    const urlToSend = await res.json();
-    console.log(urlToSend);
-    if (!urlToSend || urlToSend.length === 0) {
-      console.log("failed out no results");
-      return;
-    };
-    await fetch(`http://localhost:4400/url?to=${urlToSend[0].url}`)
-    console.log('ran', urlToSend[0].url);
-
-    // ONLY ADD: Create den for this search query
-
     try {
-      console.log('🎯 Creating hop session for search query:', query);
+      console.log('🔍 Starting enhanced search with central node management:', query);
       
-      // Create hop session with 10 search results
+      // Use the new enhanced search function that creates central node and hop session
+      const searchResponse = await fetch(`http://localhost:4000/search?query=${encodeURIComponent(query)}&limit=10`);
+      
+      if (!searchResponse.ok) {
+        throw new Error(`Search failed: ${searchResponse.status}`);
+      }
+
+      const searchResult = await searchResponse.json();
+      console.log('✅ Enhanced search completed successfully!');
+      console.log('📊 Search result details:');
+      console.log('  - Pages found:', searchResult.pages.length);
+      console.log('  - Central node query:', searchResult.centralNode.query);
+      console.log('  - Hop session ID:', searchResult.hopSessionId);
+      console.log('  - Central node pages:', searchResult.centralNode.pages.length);
+
+      // Create a hop session for navigation (still needed for the hop functionality)
       const hopResponse = await fetch('http://localhost:4000/hop', {
         method: 'POST',
         headers: {
@@ -46,48 +47,23 @@ export default function SearchBar() {
       }
 
       const hopData = await hopResponse.json();
-      console.log('✅ Hop session created successfully!');
-      console.log('📊 Hop session details:');
-      console.log('  - Session ID:', hopData.sessionId);
-      console.log('  - Query:', hopData.hopState.query);
-      console.log('  - Total pages:', hopData.hopState.pages.length);
-      console.log('  - Current page:', hopData.currentPage.url);
-
-      // Create den for this search query first
-      let searchDenData = null;
-      try {
-        console.log('🏠 Creating den for search query:', query);
-        const denResponse = await fetch(`http://localhost:4000/make-den-main?query=${encodeURIComponent(query)}`);
-        if (denResponse.ok) {
-          searchDenData = await denResponse.json();
-          console.log('🏠 Den created successfully:', searchDenData);
-          console.log('🏠 Den data structure:', {
-            query: searchDenData.query,
-            pages: searchDenData.pages,
-            conceptList: searchDenData.conceptList,
-            children: searchDenData.children,
-            answer: searchDenData.answer
-          });
-        }
-      } catch (denError) {
-        console.error('❌ Failed to create den:', denError);
-      }
+      console.log('✅ Hop session created for navigation');
 
       // Open the first page in the hop session
       const firstPageUrl = hopData.currentPage.url;
-      const denDataParam = searchDenData ? encodeURIComponent(JSON.stringify(searchDenData)) : '';
-      await fetch(`http://localhost:4400/url?to=${firstPageUrl}&hopSessionId=${hopData.sessionId}&denData=${denDataParam}`);
+      const denDataParam = encodeURIComponent(JSON.stringify(searchResult.centralNode));
+      await fetch(`http://localhost:4400/url?to=${encodeURIComponent(firstPageUrl)}&hopSessionId=${hopData.sessionId}&denData=${denDataParam}`);
       console.log('🌐 Opened first page:', firstPageUrl);
       console.log('🎯 Set hop session ID:', hopData.sessionId);
-      console.log('🏠 Set den data for query:', searchDenData?.query);
+      console.log('🏠 Set central node for query:', searchResult.centralNode.query);
 
-      // Create node with both hop and den data
+      // Create node with both hop and central node data
       const newNode = {
         id: `node-${nodes.length + 1}`,
         data: { 
           label: query,
           type: 'search',
-          denData: searchDenData,
+          denData: searchResult.centralNode,
           hopSessionId: hopData.sessionId,
           hopData: hopData.hopState
         },
@@ -120,10 +96,14 @@ export default function SearchBar() {
       
       // Fallback to original search functionality
       console.log('🔄 Falling back to original search...');
-      const res = await fetch(`http://localhost:4000/search?query="${query}"`);
+      const res = await fetch(`http://localhost:4000/search?query=${encodeURIComponent(query)}`);
       const urlToSend = await res.json();
-      await fetch(`http://localhost:4400/url?to=${urlToSend[0].url}`);
-      console.log('ran', urlToSend[0].url);
+      if (urlToSend && urlToSend.length > 0) {
+        await fetch(`http://localhost:4400/url?to=${encodeURIComponent(urlToSend[0].url)}`);
+        console.log('ran', urlToSend[0].url);
+      } else {
+        console.log("No search results found");
+      }
     }
   };
 
