@@ -24,6 +24,7 @@ async function callGeminiAPI(content: string): Promise<string> {
     }
   
     const data = await response.json();
+    console.log("CONCEPTS ARE ", data)
     return data.candidates[0].content.parts[0].text;
   }
   
@@ -102,7 +103,9 @@ async function callGeminiAPI(content: string): Promise<string> {
   `;
   
       // Generate content using direct API call
+      console.log('🤖 Calling Gemini API with prompt...');
       const response_text = await callGeminiAPI(prompt);
+      console.log('🤖 Raw Gemini response:', response_text);
   
       // Parse the JSON response
       let parsedResponse;
@@ -110,8 +113,12 @@ async function callGeminiAPI(content: string): Promise<string> {
         // Extract JSON from response (in case there's extra text)
         const jsonMatch = response_text.match(/\{[\s\S]*\}/);
         const jsonString = jsonMatch ? jsonMatch[0] : response_text;
+        console.log('🔍 Extracted JSON string:', jsonString);
         parsedResponse = JSON.parse(jsonString);
+        console.log('✅ Parsed response:', parsedResponse);
       } catch (parseError) {
+        console.error('❌ JSON parse error:', parseError);
+        console.error('❌ Raw response that failed to parse:', response_text);
         return {
           success: false,
           error: 'Failed to parse AI response as JSON'
@@ -128,7 +135,7 @@ async function callGeminiAPI(content: string): Promise<string> {
   
       // Ensure we only return top 3 concepts
       const concepts = parsedResponse.concepts.slice(0, 3);
-  
+      console.log("CONCEPTS ARE ", concepts)
       return {
         success: true,
         concepts

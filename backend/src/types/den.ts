@@ -11,7 +11,7 @@ export type babyNode = {
   pages: string[];
   conceptList: concept[];
   denned: boolean;
-  parent: babyNode | bigDaddyNode;
+  parent: babyNode | bigDaddyNode | null;
   children: babyNode[];
   comparisonScore: number;
 }

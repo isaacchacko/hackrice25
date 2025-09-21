@@ -7,6 +7,7 @@ dotenv.config({ path: '../.env' });
 
 // Global state management for the central knowledge graph
 let centralBigDaddyNode: bigDaddyNode | null = null;
+
 let currentHopSession: string | null = null;
 let currentFocusNode: bigDaddyNode | null = null;
 
@@ -39,6 +40,27 @@ export function getCurrentFocusNode(): bigDaddyNode | null {
 export function setCurrentFocusNode(node: bigDaddyNode | null): void {
   currentFocusNode = node;
   console.log('🎯 Focus node set:', node?.query || 'null');
+}
+
+// Function to update the central node when focus node is updated
+export function updateCentralNodeFromFocusNode(): void {
+  if (currentFocusNode && centralBigDaddyNode) {
+    // If the focus node is the central node, update it
+    if (currentFocusNode === centralBigDaddyNode) {
+      centralBigDaddyNode = currentFocusNode;
+      console.log('🏠 Central node updated from focus node');
+    }
+    // If the focus node is a child of the central node, update the central node's children
+    else if (centralBigDaddyNode.children) {
+      const childIndex = centralBigDaddyNode.children.findIndex(child => 
+        child.title === currentFocusNode.title
+      );
+      if (childIndex !== -1) {
+        centralBigDaddyNode.children[childIndex] = currentFocusNode as any;
+        console.log('🏠 Updated child node in central node:', currentFocusNode.title);
+      }
+    }
+  }
 }
 
 // Function to create a new central bigDaddyNode from search results

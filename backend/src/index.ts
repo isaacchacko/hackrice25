@@ -6,7 +6,8 @@ import { get_concepts } from './services/get_concepts.js';
 import { get_answer } from './services/get_answer.js';
 import { make_den_main } from './services/make_den_main.js';
 import { simplify_concepts } from './services/simplify_concepts.js';
-import { search, searchWithCentralNode, getCentralBigDaddyNode, getCurrentHopSession, getCurrentFocusNode } from './services/search.js';
+import { search, searchWithCentralNode, getCentralBigDaddyNode, getCurrentHopSession, getCurrentFocusNode, updateCentralNodeFromFocusNode, setCentralBigDaddyNode } from './services/search.js';
+import { generateKnowledgeGraph, generatePreviewGraph, exportGraphData } from './services/graph_generator.js';
 import { burrow } from './services/burrow.js';
 import { get_comparisonScore } from './services/get_comparisonScore.js';
 import { sendToDen } from './services/send_toDen.js';
@@ -134,6 +135,139 @@ app.get('/central-node-state', (req: Request, res: Response) => {
     res.status(500).json({ 
       success: false, 
       error: 'Failed to get central node state' 
+    });
+  }
+});
+
+// New endpoint to update the central node from focus node
+app.post('/update-central-node', (req: Request, res: Response) => {
+  try {
+    const { node } = req.body;
+    
+    if (node) {
+      // Update the central node directly with the provided node data
+      setCentralBigDaddyNode(node);
+      console.log('🏠 Central node updated with provided data');
+    } else {
+      // Fallback to updating from focus node
+      updateCentralNodeFromFocusNode();
+    }
+    
+    const centralNode = getCentralBigDaddyNode();
+    
+    res.json({
+      success: true,
+      centralNode: centralNode,
+      message: 'Central node updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating central node:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to update central node' 
+    });
+  }
+});
+
+// Test endpoint to simulate Ctrl+D operation
+app.post('/test-ctrl-d', async (req: Request, res: Response) => {
+  try {
+    const { url } = req.body;
+    
+    if (!url) {
+      return res.status(400).json({
+        success: false,
+        error: 'URL is required'
+      });
+    }
+    
+    const centralNode = getCentralBigDaddyNode();
+    if (!centralNode) {
+      return res.status(400).json({
+        success: false,
+        error: 'No central node available. Please search first.'
+      });
+    }
+    
+    console.log('🧪 Testing Ctrl+D operation with URL:', url);
+    
+    // Call sendToDen to process the URL
+    const result = await sendToDen(url, centralNode);
+    
+    // Update the central node with the result
+    setCentralBigDaddyNode(result.node);
+    
+    res.json({
+      success: true,
+      result: result,
+      message: 'Ctrl+D operation simulated successfully'
+    });
+  } catch (error) {
+    console.error('Error in test Ctrl+D:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to simulate Ctrl+D operation' 
+    });
+  }
+});
+
+// Generate knowledge graph from central node
+app.get('/generate-graph', (req: Request, res: Response) => {
+  try {
+    const centralNode = getCentralBigDaddyNode();
+    
+    if (!centralNode) {
+      return res.status(400).json({
+        success: false,
+        error: 'No central node available. Please search first to create a central node.'
+      });
+    }
+
+    console.log('🕸️ Generating knowledge graph from central node...');
+    const graphResult = generateKnowledgeGraph(centralNode);
+    const exportData = exportGraphData(graphResult);
+    
+    res.json({
+      success: true,
+      graph: exportData,
+      stats: graphResult.stats
+    });
+  } catch (error) {
+    console.error('Error generating knowledge graph:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate knowledge graph'
+    });
+  }
+});
+
+// Generate preview graph with limited depth
+app.get('/generate-graph-preview', (req: Request, res: Response) => {
+  try {
+    const centralNode = getCentralBigDaddyNode();
+    const maxDepth = parseInt(req.query.maxDepth as string) || 2;
+    
+    if (!centralNode) {
+      return res.status(400).json({
+        success: false,
+        error: 'No central node available. Please search first to create a central node.'
+      });
+    }
+
+    console.log(`🕸️ Generating preview graph (max depth: ${maxDepth})...`);
+    const graphResult = generatePreviewGraph(centralNode, maxDepth);
+    const exportData = exportGraphData(graphResult);
+    
+    res.json({
+      success: true,
+      graph: exportData,
+      stats: graphResult.stats
+    });
+  } catch (error) {
+    console.error('Error generating preview graph:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate preview graph'
     });
   }
 });
@@ -515,30 +649,55 @@ app.post('/send-to-den', async (req: Request, res: Response) => {
 
     console.log('🎯 Send-to-den request received!');
     console.log('📤 URL to process:', url);
-    console.log('🏠 Den query:', node.query);
-    console.log('📊 Den BEFORE processing:');
-    console.log('  - Pages:', node.pages, `(length: ${node.pages.length})`);
-    console.log('  - Concepts:', node.conceptList, `(length: ${node.conceptList.length})`);
+    console.log('🏠 Node title/query:', node.query || node.title);
 
     const result = await sendToDen(url, node);
     
-    console.log('📊 Den AFTER processing:');
-    console.log('  - Pages:', result.node?.pages, `(length: ${result.node?.pages?.length})`);
-    console.log('  - Concepts:', result.node?.conceptList, `(length: ${result.node?.conceptList?.length})`);
-    console.log('📈 Processing stats:');
-    console.log('  - Concepts added:', result.concepts_added);
-    console.log('  - Concepts removed:', result.concepts_removed);
-    console.log('  - Child nodes created:', result.child_nodes_created);
-    
-    // Display comparison scores for child nodes
-    if (result.node && 'children' in result.node && result.node.children.length > 0) {
-      console.log('🎯 Child node comparison scores:');
-      result.node.children.forEach((child, index) => {
-        console.log(`  ${index + 1}. "${child.title}": ${child.comparisonScore}/100`);
-      });
+    if (result.success) {
+      console.log('✅ sendToDen completed successfully');
+      console.log('📈 Processing stats:');
+      console.log('  - Concepts added:', result.concepts_added);
+      console.log('  - Concepts removed:', result.concepts_removed);
+      console.log('  - Child nodes created:', result.child_nodes_created);
+      
+      // ✅ BETTER FIX: Clean only the parent references, keep everything else intact
+      function cleanNodeForSerialization(obj: any): any {
+        if (!obj || typeof obj !== 'object') return obj;
+        
+        if (Array.isArray(obj)) {
+          return obj.map(item => cleanNodeForSerialization(item));
+        }
+        
+        const cleaned: any = {};
+        for (const [key, value] of Object.entries(obj)) {
+          if (key === 'parent') {
+            // Replace parent with just an identifier to avoid circular refs
+            if (value && typeof value === 'object') {
+              cleaned[key] = {
+                type: 'query' in value ? 'bigDaddyNode' : 'babyNode',
+                identifier: value.query || value.title
+              };
+            } else {
+              cleaned[key] = value;
+            }
+          } else {
+            cleaned[key] = cleanNodeForSerialization(value);
+          }
+        }
+        return cleaned;
+      }
+
+      // Clean the result while preserving the full structure
+      const cleanResult = {
+        ...result,
+        node: cleanNodeForSerialization(result.node)
+      };
+      
+      res.json(cleanResult);
+    } else {
+      console.error('❌ sendToDen failed:', result.error);
+      res.status(500).json(result);
     }
-    
-    res.json(result);
   } catch (error) {
     console.error('Error in /send-to-den:', error);
     res.status(500).json({ error: 'Internal server error' });

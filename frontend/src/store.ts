@@ -12,6 +12,7 @@ type RFState = {
   previousUrl: string | null;  // ADD THIS
   toggleGraphVisibility: (currentUrl?: string, router?: any) => void;  // UPDATE THIS
   clearGraph: () => void; // <-- 1. Make sure it's in the type definition
+  generateKnowledgeGraph: (preview?: boolean, maxDepth?: number) => Promise<void>;
 };
 
 export const useStore = create<RFState>((set, get) => ({
@@ -53,5 +54,30 @@ export const useStore = create<RFState>((set, get) => ({
   // <-- 2. Make sure the function is implemented here
   clearGraph: () => {
     set({ nodes: [], edges: [] });
+  },
+
+  generateKnowledgeGraph: async (preview: boolean = true, maxDepth: number = 2) => {
+    try {
+      console.log('🕸️ Generating knowledge graph...', { preview, maxDepth });
+      
+      const endpoint = preview 
+        ? `http://localhost:4000/generate-graph-preview?maxDepth=${maxDepth}`
+        : 'http://localhost:4000/generate-graph';
+      
+      const response = await fetch(endpoint);
+      const result = await response.json();
+      
+      if (result.success) {
+        set({ 
+          nodes: result.graph.nodes, 
+          edges: result.graph.edges 
+        });
+        console.log('✅ Knowledge graph generated successfully:', result.stats);
+      } else {
+        console.error('❌ Failed to generate graph:', result.error);
+      }
+    } catch (error) {
+      console.error('❌ Error generating knowledge graph:', error);
+    }
   },
 }));

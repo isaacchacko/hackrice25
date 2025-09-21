@@ -26,6 +26,13 @@ export default function Home() {
       <div className="w-full max-w-md sm:max-w-lg md:max-w-2xl lg:max-w-4xl xl:max-w-6xl 2xl:max-w-7xl px-8">
         <SearchBar />
       </div>
+      
+      {/* Keyboard shortcut hint */}
+      <div className="mt-8 text-center">
+        <p className="text-slate-500 text-sm">
+          Press <kbd className="bg-gray-700 px-2 py-1 rounded text-xs">Alt+G</kbd> to view the knowledge graph
+        </p>
+      </div>
     </div>
   );
 }

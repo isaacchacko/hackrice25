@@ -1,9 +1,11 @@
 // In src/components/GlobalKeyListener.tsx
 'use client';
 import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useStore } from '@/store';
 
 export default function GlobalKeyListener() {
+  const router = useRouter();
   // Get both functions from the store
   const { toggleGraphVisibility, clearGraph } = useStore(); 
   
@@ -14,12 +16,20 @@ export default function GlobalKeyListener() {
         return;
       }
       
-      // Check for the 'g' key to toggle visibility
-      if (event.key === 'g') { 
+      console.log('🎹 Key pressed:', event.key, 'Alt:', event.altKey, 'Ctrl:', event.ctrlKey);
+      
+      // Check for Alt+G to open knowledge graph
+      if (event.altKey && event.key === 'g') {
+        event.preventDefault();
+        console.log('🕸️ Alt+G pressed - opening knowledge graph');
+        router.push('/graph');
+      }
+      // Check for the 'g' key to toggle visibility (legacy)
+      else if (event.key === 'g' && !event.altKey) { 
         event.preventDefault();
         toggleGraphVisibility();
       } 
-      // Check for the 'Escape' key to clear the graph
+      // Check for the 'h' key to clear the graph
       else if (event.key === 'h') { 
         event.preventDefault();
         clearGraph();
@@ -31,7 +41,7 @@ export default function GlobalKeyListener() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [toggleGraphVisibility, clearGraph]); // <-- Add clearGraph to the dependency array
+  }, [toggleGraphVisibility, clearGraph, router]); // <-- Add router to the dependency array
   
   return null;
 }

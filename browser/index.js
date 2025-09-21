@@ -268,6 +268,7 @@ app.whenReady().then(async () => {
 
   // Your shortcuts
   globalShortcut.register('Alt+G', () => {
+    
     updateState({ action: "CREATE_NODE" })
     if (!lastUrl) {
       lastUrl = win.webContents.getURL();
@@ -284,6 +285,7 @@ app.whenReady().then(async () => {
   });
 
   globalShortcut.register('Alt+W', async () => {
+    currentFocusNode = null;
     console.log('refreshing the prompt!!');
     win.loadURL('http://localhost:3000'); // This navigates the Electron window!
     updateState({ action: 'CLEAR_NODES' });
@@ -292,28 +294,24 @@ app.whenReady().then(async () => {
 
   globalShortcut.register('CommandOrControl+D', async () => {
     console.log('🎯 Ctrl+D pressed in Electron!');
-
-    // Get the current URL from the Electron window
+  
     const currentUrl = win.webContents.getURL();
     console.log('📤 Current URL:', currentUrl);
-
+  
     try {
-      // If no focus node exists, we can't proceed
       if (!currentFocusNode) {
         console.log('❌ No focus node available. Please search first to create a den.');
-        console.log('💡 Tip: Search for something in the frontend to create a den, then use Ctrl+D on the results.');
         return;
       }
-
-      console.log('🎯 Using focus node for processing:');
-      console.log('  - Node type:', currentFocusNode.query ? 'bigDaddyNode' : 'babyNode');
+  
+      console.log('🎯 BEFORE processing - Focus node state:');
+      console.log('  - Type:', currentFocusNode.query ? 'bigDaddyNode' : 'babyNode');
       console.log('  - Title/Query:', currentFocusNode.query || currentFocusNode.title);
-      console.log('📊 Focus node BEFORE processing:');
       console.log('  - Pages:', currentFocusNode.pages?.length || 0);
       console.log('  - Concepts:', currentFocusNode.conceptList?.length || 0);
-
-      // Send the current page to the focus node via the backend
-      // The focus node is passed as a parameter - sendToDen will process it
+      console.log('  - Children:', currentFocusNode.children?.length || 0);
+      console.log('  - Children details:', currentFocusNode.children?.map(c => c.title) || []);
+  
       const response = await fetch('http://localhost:4000/send-to-den', {
         method: 'POST',
         headers: {
@@ -324,29 +322,121 @@ app.whenReady().then(async () => {
           node: currentFocusNode
         })
       });
-
-      if (response.ok) {
-        const result = await response.json();
+  
+      const result = await response.json();
+  
+      if (response.ok && result.success) {
         console.log('✅ Page sent to den successfully!');
-        console.log('📊 Processing results:');
-        console.log('  - Query/Title:', result.node?.query || result.node?.title);
-        console.log('  - Pages:', result.node?.pages, `(length: ${result.node?.pages?.length})`);
-        console.log('  - Concepts:', result.node?.conceptList, `(length: ${result.node?.conceptList?.length})`);
-        console.log('📈 Statistics:');
-        console.log('  - Concepts added:', result.concepts_added);
-        console.log('  - Concepts removed:', result.concepts_removed);
-        console.log('  - Child nodes created:', result.child_nodes_created);
-
-        // ✅ NO changes to currentFocusNode - it remains exactly as it was
-        console.log('🎯 Focus node unchanged - processing completed');
-        
+  
+        // ✅ CRITICAL FIX: Properly sync the modified node back to local state
+        if (result.node) {
+          // Update all properties from the backend response
+          if (result.node.pages) {
+            currentFocusNode.pages = [...result.node.pages];
+          }
+          
+          if (result.node.conceptList) {
+            currentFocusNode.conceptList = [...result.node.conceptList];
+          }
+          
+          // ✅ MOST IMPORTANT: Update children array
+          if (result.node.children) {
+            console.log('🔄 Updating children array from backend response');
+            console.log('  - Backend returned children count:', result.node.children.length);
+            
+            // Create new child objects and restore parent references
+            currentFocusNode.children = result.node.children.map(backendChild => {
+              const childNode = {
+                title: backendChild.title,
+                pages: [...backendChild.pages],
+                conceptList: [...backendChild.conceptList],
+                denned: backendChild.denned || false,
+                parent: currentFocusNode, // ✅ Restore parent reference
+                children: backendChild.children || [],
+                comparisonScore: backendChild.comparisonScore || 0
+              };
+              return childNode;
+            });
+            
+            console.log('✅ Children array updated successfully');
+            console.log('  - New children count:', currentFocusNode.children.length);
+            console.log('  - Children titles:', currentFocusNode.children.map(c => c.title));
+          }
+          
+          // Update answer for bigDaddyNode
+          if (result.node.answer !== undefined && 'answer' in currentFocusNode) {
+            currentFocusNode.answer = result.node.answer;
+          }
+  
+          // ✅ CRITICAL: Update the global den data if this is the root node
+          console.log('🔍 Debug: currentFocusNode === currentDenData?', currentFocusNode === currentDenData);
+          console.log('🔍 Debug: currentFocusNode type:', currentFocusNode?.query ? 'bigDaddyNode' : 'babyNode');
+          console.log('🔍 Debug: currentDenData type:', currentDenData?.query ? 'bigDaddyNode' : 'babyNode');
+          
+          if (currentFocusNode === currentDenData) {
+            console.log('🏠 Updated global den data (root node modified)');
+            // currentDenData is already updated since it's the same reference
+          } else {
+            // If it's a baby node, update it in the parent's structure
+            console.log('👶 Updated baby node in parent structure');
+            updateBabyNodeInDenData(currentFocusNode);
+          }
+          
+          // Always sync the central node (currentDenData) to backend
+          try {
+            console.log('🔄 Syncing central node with backend...');
+            console.log('📊 Current den data children count:', currentDenData.children?.length || 0);
+            console.log('📊 Current den data children:', currentDenData.children?.map(c => c.title) || []);
+            
+            const updateResponse = await fetch('http://localhost:4000/update-central-node', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ node: currentDenData })
+            });
+            
+            if (updateResponse.ok) {
+              const responseData = await updateResponse.json();
+              console.log('✅ Central node synced with backend');
+              console.log('📊 Backend response children count:', responseData.centralNode?.children?.length || 0);
+            } else {
+              const errorText = await updateResponse.text();
+              console.warn('⚠️ Failed to sync central node with backend:', errorText);
+            }
+          } catch (error) {
+            console.error('❌ Error syncing central node:', error);
+          }
+  
+          console.log('🎯 AFTER processing - Focus node state:');
+          console.log('  - Pages:', currentFocusNode.pages?.length || 0);
+          console.log('  - Concepts:', currentFocusNode.conceptList?.length || 0);
+          console.log('  - Children:', currentFocusNode.children?.length || 0);
+          console.log('  - Children details:', currentFocusNode.children?.map(c => c.title) || []);
+          
+          console.log('📈 Processing Statistics:');
+          console.log('  - Concepts added:', result.concepts_added);
+          console.log('  - Concepts removed:', result.concepts_removed);
+          console.log('  - Child nodes created:', result.child_nodes_created);
+          
+          // Detailed child node logging
+          if (currentFocusNode.children && currentFocusNode.children.length > 0) {
+            console.log('👶 Child nodes created:');
+            currentFocusNode.children.forEach((child, index) => {
+              console.log(`  ${index + 1}. "${child.title}" (score: ${child.comparisonScore || 'N/A'})`);
+            });
+          }
+        }
       } else {
         console.error('❌ Failed to send page to den:', response.status);
+        if (result.error) {
+          console.error('❌ Error details:', result.error);
+        }
       }
     } catch (error) {
       console.error('❌ Error sending page to den:', error);
     }
-  })
+  });
 
   globalShortcut.register('CommandOrControl+Left', async () => {
     console.log('🎯 Ctrl+Left pressed in Electron!');
