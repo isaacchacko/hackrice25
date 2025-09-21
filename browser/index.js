@@ -648,7 +648,69 @@ app.whenReady().then(async () => {
   globalShortcut.register('CommandOrControl+Left', async () => {
     console.log('🎯 Ctrl+Left pressed in Electron!');
 
-    
+    // Show loading popup immediately
+    try {
+      await win.webContents.executeJavaScript(`
+        // Remove existing hop popup if it exists
+        const existingHopPopup = document.getElementById('hop-loading-popup');
+        if (existingHopPopup) {
+          existingHopPopup.remove();
+        }
+        
+        // Create hop loading popup
+        const hopPopup = document.createElement('div');
+        hopPopup.id = 'hop-loading-popup';
+        hopPopup.style.cssText = \`
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          width: 120px;
+          height: 60px;
+          background: rgba(0, 0, 0, 0.8);
+          color: white;
+          border-radius: 8px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          z-index: 2147483647;
+          font-family: Arial, sans-serif;
+          font-size: 12px;
+          animation: slideInRight 0.3s ease-out;
+        \`;
+        
+        // Add CSS animation
+        const hopStyle = document.createElement('style');
+        hopStyle.textContent = \`
+          @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+          }
+          @keyframes slideOutRight {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+          }
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        \`;
+        document.head.appendChild(hopStyle);
+        
+        // Create loading content
+        hopPopup.innerHTML = \`
+          <div style="width: 20px; height: 20px; border: 2px solid #ffffff40; border-top: 2px solid #ffffff; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 8px;"></div>
+          <div style="text-align: center;">Loading...</div>
+        \`;
+        
+        // Add to page
+        document.body.appendChild(hopPopup);
+        
+        console.log('🎭 Hop loading popup created');
+      `);
+    } catch (error) {
+      console.error('Error showing hop loading popup:', error);
+    }
 
     try {
       console.log('🔄 Navigating to previous page in hop session...');
@@ -670,20 +732,121 @@ app.whenReady().then(async () => {
         console.log('  - Total pages:', result.hopState.pages.length);
         console.log('  - Query:', result.hopState.query);
 
+        // Remove loading popup
+        try {
+          await win.webContents.executeJavaScript(`
+            const hopPopup = document.getElementById('hop-loading-popup');
+            if (hopPopup) {
+              hopPopup.style.animation = 'slideOutRight 0.3s ease-out';
+              setTimeout(() => hopPopup.remove(), 300);
+            }
+          `);
+        } catch (error) {
+          console.error('Error removing hop popup:', error);
+        }
+
         // Navigate the Electron window to the new URL
         win.loadURL(newUrl);
       } else {
         console.error('❌ Failed to navigate hop session:', response.status);
+        
+        // Remove loading popup on error
+        try {
+          await win.webContents.executeJavaScript(`
+            const hopPopup = document.getElementById('hop-loading-popup');
+            if (hopPopup) {
+              hopPopup.style.animation = 'slideOutRight 0.3s ease-out';
+              setTimeout(() => hopPopup.remove(), 300);
+            }
+          `);
+        } catch (error) {
+          console.error('Error removing hop popup:', error);
+        }
       }
     } catch (error) {
       console.error('❌ Error navigating hop session:', error);
+      
+      // Remove loading popup on error
+      try {
+        await win.webContents.executeJavaScript(`
+          const hopPopup = document.getElementById('hop-loading-popup');
+          if (hopPopup) {
+            hopPopup.style.animation = 'slideOutRight 0.3s ease-out';
+            setTimeout(() => hopPopup.remove(), 300);
+          }
+        `);
+      } catch (popupError) {
+        console.error('Error removing hop popup:', popupError);
+      }
     }
   })
 
   globalShortcut.register('CommandOrControl+Right', async () => {
     console.log('🎯 Ctrl+Right pressed in Electron!');
 
-    
+    // Show loading popup immediately
+    try {
+      await win.webContents.executeJavaScript(`
+        // Remove existing hop popup if it exists
+        const existingHopPopup = document.getElementById('hop-loading-popup');
+        if (existingHopPopup) {
+          existingHopPopup.remove();
+        }
+        
+        // Create hop loading popup
+        const hopPopup = document.createElement('div');
+        hopPopup.id = 'hop-loading-popup';
+        hopPopup.style.cssText = \`
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          width: 120px;
+          height: 60px;
+          background: rgba(0, 0, 0, 0.8);
+          color: white;
+          border-radius: 8px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          z-index: 2147483647;
+          font-family: Arial, sans-serif;
+          font-size: 12px;
+          animation: slideInRight 0.3s ease-out;
+        \`;
+        
+        // Add CSS animation
+        const hopStyle = document.createElement('style');
+        hopStyle.textContent = \`
+          @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+          }
+          @keyframes slideOutRight {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+          }
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        \`;
+        document.head.appendChild(hopStyle);
+        
+        // Create loading content
+        hopPopup.innerHTML = \`
+          <div style="width: 20px; height: 20px; border: 2px solid #ffffff40; border-top: 2px solid #ffffff; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 8px;"></div>
+          <div style="text-align: center;">Loading...</div>
+        \`;
+        
+        // Add to page
+        document.body.appendChild(hopPopup);
+        
+        console.log('🎭 Hop loading popup created');
+      `);
+    } catch (error) {
+      console.error('Error showing hop loading popup:', error);
+    }
 
     try {
       console.log('🔄 Navigating to next page in hop session...');
@@ -705,13 +868,52 @@ app.whenReady().then(async () => {
         console.log('  - Total pages:', result.hopState.pages.length);
         console.log('  - Query:', result.hopState.query);
 
+        // Remove loading popup
+        try {
+          await win.webContents.executeJavaScript(`
+            const hopPopup = document.getElementById('hop-loading-popup');
+            if (hopPopup) {
+              hopPopup.style.animation = 'slideOutRight 0.3s ease-out';
+              setTimeout(() => hopPopup.remove(), 300);
+            }
+          `);
+        } catch (error) {
+          console.error('Error removing hop popup:', error);
+        }
+
         // Navigate the Electron window to the new URL
         win.loadURL(newUrl);
       } else {
         console.error('❌ Failed to navigate hop session:', response.status);
+        
+        // Remove loading popup on error
+        try {
+          await win.webContents.executeJavaScript(`
+            const hopPopup = document.getElementById('hop-loading-popup');
+            if (hopPopup) {
+              hopPopup.style.animation = 'slideOutRight 0.3s ease-out';
+              setTimeout(() => hopPopup.remove(), 300);
+            }
+          `);
+        } catch (error) {
+          console.error('Error removing hop popup:', error);
+        }
       }
     } catch (error) {
       console.error('❌ Error navigating hop session:', error);
+      
+      // Remove loading popup on error
+      try {
+        await win.webContents.executeJavaScript(`
+          const hopPopup = document.getElementById('hop-loading-popup');
+          if (hopPopup) {
+            hopPopup.style.animation = 'slideOutRight 0.3s ease-out';
+            setTimeout(() => hopPopup.remove(), 300);
+          }
+        `);
+      } catch (popupError) {
+        console.error('Error removing hop popup:', popupError);
+      }
     }
   })
 
