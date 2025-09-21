@@ -1,17 +1,6 @@
 // backend/src/services/make_den_main.ts
 
-
-interface Concept {
-  title: string;
-  description: string;
-}
-
-interface DenMainResponse {
-  query: string;
-  pages: string[];
-  conceptList: Concept[];
-  children: any[];
-}
+import type { concept, DenMainResponse } from '../types/den.js';
 
 /**
  * Creates a den main response with the given query and empty arrays for pages, concepts, and children
@@ -30,7 +19,8 @@ export async function make_den_main(query: string): Promise<DenMainResponse> {
       query: query.trim(),
       pages: [],
       conceptList: [],
-      children: []
+      children: [],
+      answer: ""
     };
 
     // Console logging as requested

@@ -44,7 +44,8 @@ export default function KeyboardHandler() {
           query: denData.query,
           pages: denData.pages || [],
           conceptList: denData.conceptList || [],
-          children: denData.children || []
+          children: denData.children || [],
+          answer: denData.answer || ""
         };
         
         console.log('📊 Den content BEFORE sending page:');

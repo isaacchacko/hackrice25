@@ -9,10 +9,34 @@ let win;
 let currentHopSession = null;
 // Global variable to store current den data
 let currentDenData = null;
+// Global variable to track which node is currently the focus
+let currentFocusNode = null;
 const fs = require('fs');
 const path = require('path');
 
 let lastUrl;
+
+// Helper function to update a babyNode in the den data structure
+function updateBabyNodeInDenData(updatedBabyNode) {
+  if (!currentDenData || !currentDenData.children) {
+    console.warn('No den data or children array available for update');
+    return;
+  }
+  
+  // Find and update the babyNode in the children array
+  const childIndex = currentDenData.children.findIndex(child => 
+    child.title === updatedBabyNode.title && 
+    child.pages && updatedBabyNode.pages && 
+    child.pages[0] === updatedBabyNode.pages[0]
+  );
+  
+  if (childIndex !== -1) {
+    currentDenData.children[childIndex] = updatedBabyNode;
+    console.log(`✅ Updated babyNode "${updatedBabyNode.title}" in den data structure`);
+  } else {
+    console.warn(`⚠️ Could not find babyNode "${updatedBabyNode.title}" in den data structure`);
+  }
+}
 
 function createWindow() {
   win = new BrowserWindow({
@@ -62,7 +86,10 @@ server.get('/url', (req, res) => {
     if (denData) {
       try {
         currentDenData = JSON.parse(denData);
+        // Set the focus node to the root (bigDaddyNode) initially
+        currentFocusNode = currentDenData;
         console.log('🏠 Den data set from URL request:', currentDenData.query);
+        console.log('🎯 Focus node set to root (bigDaddyNode)');
         console.log('📊 Den pages count:', currentDenData.pages?.length || 0);
         console.log('📊 Den concepts count:', currentDenData.conceptList?.length || 0);
       } catch (err) {
@@ -75,6 +102,72 @@ server.get('/url', (req, res) => {
     res.status(400).send('Missing window or url');
   }
 });
+
+// New endpoint to change the focus node
+server.post('/set-focus-node', (req, res) => {
+  try {
+    const { nodeType, nodeId } = req.body;
+    
+    if (!nodeType || !nodeId) {
+      return res.status(400).json({ error: 'nodeType and nodeId are required' });
+    }
+    
+    if (!currentDenData) {
+      return res.status(400).json({ error: 'No den data available' });
+    }
+    
+    if (nodeType === 'bigDaddyNode') {
+      // Set focus to the root bigDaddyNode
+      currentFocusNode = currentDenData;
+      console.log('🎯 Focus changed to bigDaddyNode:', currentFocusNode.query);
+    } else if (nodeType === 'babyNode') {
+      // Find the specific babyNode by ID or title
+      const babyNode = findBabyNodeById(currentDenData, nodeId);
+      if (babyNode) {
+        currentFocusNode = babyNode;
+        console.log('🎯 Focus changed to babyNode:', currentFocusNode.title);
+      } else {
+        return res.status(404).json({ error: 'BabyNode not found' });
+      }
+    } else {
+      return res.status(400).json({ error: 'Invalid nodeType. Must be "bigDaddyNode" or "babyNode"' });
+    }
+    
+    res.json({ 
+      success: true, 
+      focusNode: {
+        type: nodeType,
+        title: currentFocusNode.title || currentFocusNode.query,
+        pages: currentFocusNode.pages?.length || 0,
+        concepts: currentFocusNode.conceptList?.length || 0
+      }
+    });
+  } catch (error) {
+    console.error('Error setting focus node:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Helper function to find a babyNode by ID or title
+function findBabyNodeById(denData, nodeId) {
+  if (!denData.children) return null;
+  
+  // First try to find by exact ID match
+  let found = denData.children.find(child => child.id === nodeId);
+  if (found) return found;
+  
+  // Then try to find by title match
+  found = denData.children.find(child => child.title === nodeId);
+  if (found) return found;
+  
+  // Recursively search in nested children
+  for (const child of denData.children) {
+    const nested = findBabyNodeById(child, nodeId);
+    if (nested) return nested;
+  }
+  
+  return null;
+}
 
 const PORT = 4400;
 server.listen(PORT, () => {
@@ -205,21 +298,21 @@ app.whenReady().then(async () => {
     console.log('📤 Current URL:', currentUrl);
 
     try {
-      let denData = currentDenData;
-
-      // If no den data exists, we can't proceed
-      if (!denData) {
-        console.log('❌ No den data available. Please search first to create a den.');
+      // If no focus node exists, we can't proceed
+      if (!currentFocusNode) {
+        console.log('❌ No focus node available. Please search first to create a den.');
         console.log('💡 Tip: Search for something in the frontend to create a den, then use Ctrl+D on the results.');
         return;
       }
 
-      console.log('🏠 Using existing den for query:', denData.query);
-      console.log('📊 Den BEFORE processing:');
-      console.log('  - Pages:', denData.pages?.length || 0);
-      console.log('  - Concepts:', denData.conceptList?.length || 0);
+      console.log('🎯 Using focus node for processing:');
+      console.log('  - Node type:', currentFocusNode.query ? 'bigDaddyNode' : 'babyNode');
+      console.log('  - Title/Query:', currentFocusNode.query || currentFocusNode.title);
+      console.log('📊 Focus node BEFORE processing:');
+      console.log('  - Pages:', currentFocusNode.pages?.length || 0);
+      console.log('  - Concepts:', currentFocusNode.conceptList?.length || 0);
 
-      // Send the current page to the den via the backend
+      // Send the current page to the focus node via the backend
       const response = await fetch('http://localhost:4000/send-to-den', {
         method: 'POST',
         headers: {
@@ -227,24 +320,36 @@ app.whenReady().then(async () => {
         },
         body: JSON.stringify({
           url: currentUrl,
-          node: denData
+          node: currentFocusNode
         })
       });
 
       if (response.ok) {
         const result = await response.json();
         console.log('✅ Page sent to den successfully!');
-        console.log('📊 Den content after processing:');
-        console.log('  - Query:', result.node?.query);
+        console.log('📊 Focus node content after processing:');
+        console.log('  - Query/Title:', result.node?.query || result.node?.title);
         console.log('  - Pages:', result.node?.pages, `(length: ${result.node?.pages?.length})`);
         console.log('  - Concepts:', result.node?.conceptList, `(length: ${result.node?.conceptList?.length})`);
         console.log('📈 Statistics:');
         console.log('  - Concepts added:', result.concepts_added);
         console.log('  - Concepts removed:', result.concepts_removed);
+        console.log('  - Child nodes created:', result.child_nodes_created);
 
-        // Update the stored den data with the new data
-        currentDenData = result.node;
-        console.log('🔄 Updated stored den data');
+        // Update the focus node with the new data
+        currentFocusNode = result.node;
+        
+        // If this was a bigDaddyNode, also update the root den data
+        if (currentFocusNode.query) {
+          currentDenData = currentFocusNode;
+          console.log('🔄 Updated root den data (bigDaddyNode)');
+        } else {
+          // If this was a babyNode, update it in the root den data structure
+          updateBabyNodeInDenData(currentFocusNode);
+          console.log('🔄 Updated babyNode in den data structure');
+        }
+        
+        console.log('🎯 Focus node updated');
       } else {
         console.error('❌ Failed to send page to den:', response.status);
       }
@@ -256,10 +361,7 @@ app.whenReady().then(async () => {
   globalShortcut.register('CommandOrControl+Left', async () => {
     console.log('🎯 Ctrl+Left pressed in Electron!');
 
-    if (!currentHopSession) {
-      console.log('❌ No active hop session. Please search first to create a hop session.');
-      return;
-    }
+    
 
     try {
       console.log('🔄 Navigating to previous page in hop session...');
@@ -294,10 +396,7 @@ app.whenReady().then(async () => {
   globalShortcut.register('CommandOrControl+Right', async () => {
     console.log('🎯 Ctrl+Right pressed in Electron!');
 
-    if (!currentHopSession) {
-      console.log('❌ No active hop session. Please search first to create a hop session.');
-      return;
-    }
+    
 
     try {
       console.log('🔄 Navigating to next page in hop session...');

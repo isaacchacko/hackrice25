@@ -498,6 +498,15 @@ app.post('/send-to-den', async (req: Request, res: Response) => {
     console.log('📈 Processing stats:');
     console.log('  - Concepts added:', result.concepts_added);
     console.log('  - Concepts removed:', result.concepts_removed);
+    console.log('  - Child nodes created:', result.child_nodes_created);
+    
+    // Display comparison scores for child nodes
+    if (result.node && 'children' in result.node && result.node.children.length > 0) {
+      console.log('🎯 Child node comparison scores:');
+      result.node.children.forEach((child, index) => {
+        console.log(`  ${index + 1}. "${child.title}": ${child.comparisonScore}/100`);
+      });
+    }
     
     res.json(result);
   } catch (error) {
