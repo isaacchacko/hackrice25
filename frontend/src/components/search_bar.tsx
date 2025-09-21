@@ -65,7 +65,8 @@ export default function SearchBar() {
             query: searchDenData.query,
             pages: searchDenData.pages,
             conceptList: searchDenData.conceptList,
-            children: searchDenData.children
+            children: searchDenData.children,
+            answer: searchDenData.answer
           });
         }
       } catch (denError) {
