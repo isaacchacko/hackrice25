@@ -313,6 +313,7 @@ app.whenReady().then(async () => {
       console.log('  - Concepts:', currentFocusNode.conceptList?.length || 0);
 
       // Send the current page to the focus node via the backend
+      // The focus node is passed as a parameter - sendToDen will process it
       const response = await fetch('http://localhost:4000/send-to-den', {
         method: 'POST',
         headers: {
@@ -327,7 +328,7 @@ app.whenReady().then(async () => {
       if (response.ok) {
         const result = await response.json();
         console.log('✅ Page sent to den successfully!');
-        console.log('📊 Focus node content after processing:');
+        console.log('📊 Processing results:');
         console.log('  - Query/Title:', result.node?.query || result.node?.title);
         console.log('  - Pages:', result.node?.pages, `(length: ${result.node?.pages?.length})`);
         console.log('  - Concepts:', result.node?.conceptList, `(length: ${result.node?.conceptList?.length})`);
@@ -336,20 +337,9 @@ app.whenReady().then(async () => {
         console.log('  - Concepts removed:', result.concepts_removed);
         console.log('  - Child nodes created:', result.child_nodes_created);
 
-        // Update the focus node with the new data
-        currentFocusNode = result.node;
+        // ✅ NO changes to currentFocusNode - it remains exactly as it was
+        console.log('🎯 Focus node unchanged - processing completed');
         
-        // If this was a bigDaddyNode, also update the root den data
-        if (currentFocusNode.query) {
-          currentDenData = currentFocusNode;
-          console.log('🔄 Updated root den data (bigDaddyNode)');
-        } else {
-          // If this was a babyNode, update it in the root den data structure
-          updateBabyNodeInDenData(currentFocusNode);
-          console.log('🔄 Updated babyNode in den data structure');
-        }
-        
-        console.log('🎯 Focus node updated');
       } else {
         console.error('❌ Failed to send page to den:', response.status);
       }
