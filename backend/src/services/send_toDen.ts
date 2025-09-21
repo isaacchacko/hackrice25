@@ -11,11 +11,11 @@ import type { concept, babyNode, bigDaddyNode, SendToDenResponse } from '../type
  * @returns Promise containing the updated node or error information
  */
 export async function sendToDen(
-  url: string, 
+  url: string,
   node: babyNode | bigDaddyNode
 ): Promise<SendToDenResponse> {
-  console.log('🚀 sendToDen called with:', { 
-    url, 
+  console.log('🚀 sendToDen called with:', {
+    url,
     nodeTitle: 'query' in node ? node.query : node.title,
     initialPages: node.pages.length,
     initialConcepts: node.conceptList.length,
@@ -58,7 +58,7 @@ export async function sendToDen(
     // Store original concept count for tracking
     const originalConceptCount = node.conceptList.length;
     const newConcepts = conceptsResult.concepts;
-    
+
     console.log(`📝 Extracted ${newConcepts.length} new concepts`);
 
     // Add new concepts to the node's conceptList
@@ -67,14 +67,14 @@ export async function sendToDen(
     // Create child nodes for each new concept
     console.log('👶 Creating child nodes for new concepts...');
     const newChildNodes: babyNode[] = [];
-    
+
     for (const concept of newConcepts) {
       // Calculate comparison score between concept title and parent node query/title
       let comparisonScore = 0;
       try {
         const parentQuery = 'query' in node ? node.query : node.title;
         console.log(`📊 Calculating comparison score for "${concept.title}" vs "${parentQuery}"`);
-        
+
         const scoreResult = await get_comparisonScore(concept.title, parentQuery);
         if (scoreResult.success && typeof scoreResult.score === 'number') {
           comparisonScore = scoreResult.score;
@@ -90,16 +90,16 @@ export async function sendToDen(
       }
 
       // Check if a child node with this concept already exists
-      const existingChildIndex = 'children' in node ? 
+      const existingChildIndex = 'children' in node ?
         node.children.findIndex(child => child.title === concept.title) : -1;
-      
+
       if (existingChildIndex !== -1 && 'children' in node) {
         // Update existing child node
         const existingChild = node.children[existingChildIndex];
         if (existingChild) {
           existingChild.pages.push(url);
           existingChild.conceptList.push(concept);
-          existingChild.comparisonScore = Math.max(existingChild.comparisonScore, comparisonScore);
+          existingChild.comparisonScore = Math.max(existingChild.comparisonScore, comparisonScore / 100);
           console.log(`🔄 Updated existing child node: "${concept.title}" (score: ${existingChild.comparisonScore})`);
         }
       } else {
@@ -111,9 +111,9 @@ export async function sendToDen(
           denned: false,
           parent: null, // Set to null initially to avoid circular refs during processing
           children: [],
-          comparisonScore: comparisonScore
+          comparisonScore: comparisonScore / 100
         };
-        
+
         newChildNodes.push(childNode);
         console.log(`✅ Created new child node: "${concept.title}" (score: ${comparisonScore})`);
       }
@@ -122,12 +122,12 @@ export async function sendToDen(
     // Add new child nodes to the parent node's children array
     if ('children' in node) {
       node.children.push(...newChildNodes);
-      
+
       // Set parent references after adding to avoid circular issues during processing
       newChildNodes.forEach(child => {
         child.parent = node;
       });
-      
+
       console.log(`📈 Added ${newChildNodes.length} child nodes to parent`);
     }
 
@@ -146,7 +146,7 @@ export async function sendToDen(
     const conceptsRemoved = simplifyResult.removed_count || 0;
     node.conceptList = simplifyResult.concepts;
     console.log(`🔄 Concept simplification complete. Removed ${conceptsRemoved} duplicates`);
-    
+
     // Add the URL to the node's denPages list (only if it doesn't already exist)
     if (!urlAlreadyExists && 'denPages' in node) {
       // Initialize denPages array if it doesn't exist
@@ -171,20 +171,20 @@ export async function sendToDen(
       console.log('  - Current answer:', node.answer);
       console.log('  - Pages count:', node.pages.length);
       console.log('  - Concepts count:', node.conceptList.length);
-      
+
       try {
         // Only regenerate answer if we have enough content (den pages and concepts)
         const denPages = node.denPages || [];
         const hasEnoughContent = denPages.length > 0 && node.conceptList.length > 0;
-        
+
         if (hasEnoughContent) {
           // Generate a comprehensive general answer about the topic
           const generalQuestion = `Provide a comprehensive overview and explanation of "${node.query}". Include key concepts, important details, and relevant information.`;
-          
+
           console.log('🤖 Generating answer with question:', generalQuestion);
           console.log('📄 Using den pages:', denPages.slice(0, 3), '...');
           console.log('🧠 Using concepts:', node.conceptList.slice(0, 3), '...');
-          
+
           const answerResult = await get_answer(
             denPages,             // URLs only from den pages (what user added)
             node.conceptList,     // Concepts from the node's conceptList
@@ -272,7 +272,7 @@ export async function testSendToDen() {
   console.log('  - Answer length:', testNode.answer.length);
 
   const result = await sendToDen('https://en.wikipedia.org/wiki/Artificial_intelligence', testNode);
-  
+
   if (result.success) {
     console.log('✅ Test completed successfully!');
     console.log('📊 Final state:');
@@ -284,7 +284,7 @@ export async function testSendToDen() {
     console.log('  - Concepts added:', result.concepts_added);
     console.log('  - Concepts removed:', result.concepts_removed);
     console.log('  - Child nodes created:', result.child_nodes_created);
-    
+
     if (testNode.children.length > 0) {
       console.log('👶 Child node comparison scores:');
       testNode.children.forEach((child, index) => {
