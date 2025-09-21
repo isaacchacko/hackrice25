@@ -7,6 +7,8 @@ const fetch = require('node-fetch')
 let win;
 // Global variable to store current hop session
 let currentHopSession = null;
+// Global variable to store current burrow session
+let currentBurrowSession = null;
 // Global variable to store current den data
 let currentDenData = null;
 // Global variable to track which node is currently the focus
@@ -22,13 +24,13 @@ let lastUrl;
 // Helper function to create or update page counter
 async function updatePageCounter() {
   console.log('📄 updatePageCounter called, totalPages:', totalPages, 'currentPageIndex:', currentPageIndex);
-  
+
   // Only show counter if we have page data
   if (totalPages === 0) {
     console.log('📄 No pages available, skipping counter display');
     return;
   }
-  
+
   try {
     console.log('📄 Executing JavaScript to create page counter...');
     await win.webContents.executeJavaScript(`
@@ -89,15 +91,15 @@ async function updatePageCounter() {
 // Helper function to ensure page counter is shown (with retries)
 async function ensurePageCounterShown() {
   console.log('📄 ensurePageCounterShown called, totalPages:', totalPages, 'currentPageIndex:', currentPageIndex);
-  
+
   if (totalPages === 0) {
     console.log('📄 No pages available, skipping counter display');
     return;
   }
-  
+
   // Try multiple times with increasing delays
   const delays = [500, 1000, 2000, 3000];
-  
+
   for (const delay of delays) {
     setTimeout(async () => {
       try {
@@ -117,14 +119,14 @@ function updateBabyNodeInDenData(updatedBabyNode) {
     console.warn('No den data or children array available for update');
     return;
   }
-  
+
   // Find and update the babyNode in the children array
-  const childIndex = currentDenData.children.findIndex(child => 
-    child.title === updatedBabyNode.title && 
-    child.pages && updatedBabyNode.pages && 
+  const childIndex = currentDenData.children.findIndex(child =>
+    child.title === updatedBabyNode.title &&
+    child.pages && updatedBabyNode.pages &&
     child.pages[0] === updatedBabyNode.pages[0]
   );
-  
+
   if (childIndex !== -1) {
     currentDenData.children[childIndex] = updatedBabyNode;
     console.log(`✅ Updated babyNode "${updatedBabyNode.title}" in den data structure`);
@@ -149,7 +151,7 @@ function createWindow() {
   })
 
   win.loadFile('index.html')
-  
+
   // Add page counter when webview loads
   win.webContents.on('did-finish-load', async () => {
     // Always try to show page counter if we have any page data
@@ -177,6 +179,7 @@ server.use(cors({
 server.get('/url', async (req, res) => {
   const url = req.query.to;
   const hopSessionId = req.query.hopSessionId;
+  const burrowSessionId = req.query.burrowSessionId;
   const denData = req.query.denData;
 
   if (url && win) {
@@ -186,7 +189,7 @@ server.get('/url', async (req, res) => {
     if (hopSessionId) {
       currentHopSession = hopSessionId;
       console.log('🎯 Hop session set from URL request:', hopSessionId);
-      
+
       // Always initialize page counter for hop session
       // We'll get the total pages from the hop session data
       try {
@@ -196,11 +199,11 @@ server.get('/url', async (req, res) => {
           totalPages = hopData.pages?.length || 0;
           currentPageIndex = hopData.currentIndex || 0;
           console.log('📄 Initialized page counter:', `Page ${currentPageIndex + 1} of ${totalPages}`);
-          
+
           // Show page counter immediately and with retries
           console.log('📄 Calling updatePageCounter immediately...');
           await updatePageCounter();
-          
+
           // Also set up retries to ensure it appears
           ensurePageCounterShown();
         }
@@ -208,6 +211,59 @@ server.get('/url', async (req, res) => {
         console.error('Error getting hop session info:', error);
       }
     }
+
+    // Set the burrow session if provided
+if (burrowSessionId) {
+  currentBurrowSession = burrowSessionId;
+  console.log('🕳️ Burrow session set from URL request:', burrowSessionId);
+  
+  // Always initialize page counter for burrow session
+  try {
+    const burrowResponse = await fetch(`http://localhost:4000/burrow/${burrowSessionId}`);
+    if (burrowResponse.ok) {
+      const burrowData = await burrowResponse.json();
+      totalPages = burrowData.burrowState?.pages?.length || 0;
+      currentPageIndex = burrowData.burrowState?.currentIndex || 0;
+      console.log('📄 Initialized burrow page counter:', `Page ${currentPageIndex + 1} of ${totalPages}`);
+      
+      // Show page counter immediately and with retries
+      console.log('📄 Calling updatePageCounter immediately...');
+      await updatePageCounter();
+      
+      // Also set up retries to ensure it appears
+      ensurePageCounterShown();
+      
+      // ✅ CRITICAL: Set focus node to the burrowed child node
+      if (currentDenData && burrowSessionId) {
+        console.log('🎯 Setting focus node to burrowed child:', burrowSessionId);
+        console.log('🔍 Available child nodes in den data:', currentDenData.children?.map(c => c.title) || []);
+        
+        const babyNode = findBabyNodeById(currentDenData, burrowSessionId);
+        if (babyNode) {
+          console.log('✅ Found burrowed child node:', babyNode.title);
+          console.log('🔍 Burrowed child details:');
+          console.log('  - Title:', babyNode.title);
+          console.log('  - Is Den:', babyNode.isDen || false);
+          console.log('  - Current children count:', babyNode.children?.length || 0);
+          console.log('  - Current children:', babyNode.children?.map(c => c.title) || []);
+          
+          currentFocusNode = babyNode;
+          // ✅ CRITICAL: Set isDen to true when this becomes the focus node
+          currentFocusNode.isDen = true;
+          console.log('✅ Focus node set to burrowed child:', currentFocusNode.title);
+          console.log('🏠 Set isDen to true for burrowed child node');
+          console.log('🔍 DEBUG: Focus node isDen status after setting:', currentFocusNode.isDen);
+          console.log('🎯 Focus node is now:', currentFocusNode === currentDenData ? 'ROOT' : 'CHILD');
+        } else {
+          console.warn('⚠️ Could not find burrowed child node:', burrowSessionId);
+          console.log('🔍 Searched in den data children:', currentDenData.children?.map(c => c.title) || []);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error getting burrow session info:', error);
+  }
+}
 
     // Set the den data if provided
     if (denData) {
@@ -234,15 +290,15 @@ server.get('/url', async (req, res) => {
 server.post('/set-focus-node', (req, res) => {
   try {
     const { nodeType, nodeId } = req.body;
-    
+
     if (!nodeType || !nodeId) {
       return res.status(400).json({ error: 'nodeType and nodeId are required' });
     }
-    
+
     if (!currentDenData) {
       return res.status(400).json({ error: 'No den data available' });
     }
-    
+
     if (nodeType === 'bigDaddyNode') {
       // Set focus to the root bigDaddyNode
       currentFocusNode = currentDenData;
@@ -259,9 +315,9 @@ server.post('/set-focus-node', (req, res) => {
     } else {
       return res.status(400).json({ error: 'Invalid nodeType. Must be "bigDaddyNode" or "babyNode"' });
     }
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       focusNode: {
         type: nodeType,
         title: currentFocusNode.title || currentFocusNode.query,
@@ -278,21 +334,21 @@ server.post('/set-focus-node', (req, res) => {
 // Helper function to find a babyNode by ID or title
 function findBabyNodeById(denData, nodeId) {
   if (!denData.children) return null;
-  
+
   // First try to find by exact ID match
   let found = denData.children.find(child => child.id === nodeId);
   if (found) return found;
-  
+
   // Then try to find by title match
   found = denData.children.find(child => child.title === nodeId);
   if (found) return found;
-  
+
   // Recursively search in nested children
   for (const child of denData.children) {
     const nested = findBabyNodeById(child, nodeId);
     if (nested) return nested;
   }
-  
+
   return null;
 }
 
@@ -395,8 +451,17 @@ app.whenReady().then(async () => {
 
   // Your shortcuts
   globalShortcut.register('Alt+G', () => {
-    
     updateState({ action: "CREATE_NODE" })
+    
+    // If we're in a burrow session, always go to graph and clear lastUrl
+    if (currentBurrowSession) {
+      console.log('��️ Alt+G pressed during burrow session - going to graph');
+      lastUrl = undefined;
+      win.loadURL('http://localhost:3000/graph');
+      return;
+    }
+    
+    // Normal Alt+G behavior for non-burrow sessions
     if (!lastUrl) {
       lastUrl = win.webContents.getURL();
       win.loadURL('http://localhost:3000/graph');
@@ -404,7 +469,6 @@ app.whenReady().then(async () => {
       win.loadURL(lastUrl);
       lastUrl = undefined;
     }
-
   });
 
   globalShortcut.register('Alt+H', () => {
@@ -423,10 +487,11 @@ app.whenReady().then(async () => {
     currentFocusNode = null;
     currentDenData = null;
     currentHopSession = null;
+    currentBurrowSession = null;
     currentPageIndex = 0;
     totalPages = 0;
     console.log('refreshing the prompt!!');
-    
+
     // Clear page counter
     try {
       await win.webContents.executeJavaScript(`
@@ -438,7 +503,7 @@ app.whenReady().then(async () => {
     } catch (error) {
       console.error('Error clearing page counter:', error);
     }
-    
+
     // Clear memory on backend
     try {
       const response = await fetch('http://localhost:4000/clear-memory', {
@@ -447,7 +512,7 @@ app.whenReady().then(async () => {
           'Content-Type': 'application/json',
         }
       });
-      
+
       if (response.ok) {
         console.log('✅ Backend memory cleared successfully');
       } else {
@@ -456,18 +521,24 @@ app.whenReady().then(async () => {
     } catch (error) {
       console.error('❌ Error clearing backend memory:', error);
     }
-    
+
     win.loadURL('http://localhost:3000'); // This navigates the Electron window!
     updateState({ action: 'CLEAR_NODES' });
     lastUrl = undefined;
   });
 
-  globalShortcut.register('CommandOrControl+D', async () => {
+  // Register Ctrl+D shortcut
+  const ctrlDRegistered = globalShortcut.register('CommandOrControl+D', async () => {
     console.log('🎯 Ctrl+D pressed in Electron!');
-  
+    console.log('🔍 DEBUG: Ctrl+D handler started');
+    console.log('🔍 Current focus node:', currentFocusNode ? (currentFocusNode.title || currentFocusNode.query) : 'NULL');
+    console.log('🔍 Current den data:', currentDenData ? 'EXISTS' : 'NULL');
+    console.log('🔍 Current burrow session:', currentBurrowSession || 'NULL');
+
     const currentUrl = win.webContents.getURL();
     console.log('📤 Current URL:', currentUrl);
-  
+    console.log('🔍 DEBUG: About to show popup...');
+
     // Show popup immediately in the webview
     try {
       await win.webContents.executeJavaScript(`
@@ -556,13 +627,21 @@ app.whenReady().then(async () => {
         
         console.log('🎭 Popup created and displayed');
       `);
+      console.log('🔍 DEBUG: Popup shown successfully');
     } catch (error) {
       console.error('Error showing popup:', error);
+      console.log('🔍 DEBUG: Error showing popup, continuing...');
     }
-  
+
     try {
+      console.log('🔍 DEBUG: Starting main try-catch block...');
+      console.log('🔍 DEBUG: About to check focus node...');
+      console.log('🔍 Focus node check - currentFocusNode:', currentFocusNode);
+      console.log('🔍 DEBUG: Focus node isDen status:', currentFocusNode?.isDen);
+      
       if (!currentFocusNode) {
         console.log('❌ No focus node available. Please search first to create a den.');
+        console.log('🔍 DEBUG: This is why Ctrl+D is failing - no focus node!');
         // Update popup to show error
         try {
           await win.webContents.executeJavaScript(`
@@ -588,7 +667,7 @@ app.whenReady().then(async () => {
         }
         return;
       }
-  
+
       console.log('🎯 BEFORE processing - Focus node state:');
       console.log('  - Type:', currentFocusNode.query ? 'bigDaddyNode' : 'babyNode');
       console.log('  - Title/Query:', currentFocusNode.query || currentFocusNode.title);
@@ -596,23 +675,61 @@ app.whenReady().then(async () => {
       console.log('  - Concepts:', currentFocusNode.conceptList?.length || 0);
       console.log('  - Children:', currentFocusNode.children?.length || 0);
       console.log('  - Children details:', currentFocusNode.children?.map(c => c.title) || []);
-  
-      const response = await fetch('http://localhost:4000/send-to-den', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          url: currentUrl,
-          node: currentFocusNode
-        })
-      });
-  
+      console.log('  - Is Den:', currentFocusNode.isDen || false);
+      console.log('  - Focus node ID:', currentFocusNode === currentDenData ? 'ROOT' : 'CHILD');
+
+      // Clean the node to remove circular references before sending to backend
+      function cleanNodeForSerialization(obj) {
+        if (!obj || typeof obj !== 'object') return obj;
+        
+        const cleaned = Array.isArray(obj) ? [] : {};
+        for (const key in obj) {
+          if (key === 'parent') {
+            // Skip parent references to avoid circular structure
+            cleaned[key] = null;
+          } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+            cleaned[key] = cleanNodeForSerialization(obj[key]);
+          } else {
+            cleaned[key] = obj[key];
+          }
+        }
+        return cleaned;
+      }
+
+      // Use different endpoint based on whether we're in a burrow session
+      let response;
+      if (currentBurrowSession) {
+        console.log('🕳️ Using burrow-specific endpoint for adding page');
+        response = await fetch(`http://localhost:4000/burrow/${currentBurrowSession}/add-page`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            url: currentUrl
+          })
+        });
+      } else {
+        console.log('🏠 Using standard send-to-den endpoint');
+        // Clean the focus node to remove circular references
+        const cleanFocusNode = cleanNodeForSerialization(currentFocusNode);
+        response = await fetch('http://localhost:4000/send-to-den', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            url: currentUrl,
+            node: cleanFocusNode
+          })
+        });
+      }
+
       const result = await response.json();
-  
+
       if (response.ok && result.success) {
         console.log('✅ Page sent to den successfully!');
-        
+
         // Update popup to show success
         try {
           await win.webContents.executeJavaScript(`
@@ -636,23 +753,23 @@ app.whenReady().then(async () => {
         } catch (error) {
           console.error('Error updating popup:', error);
         }
-  
+
         // ✅ CRITICAL FIX: Properly sync the modified node back to local state
         if (result.node) {
           // Update all properties from the backend response
           if (result.node.pages) {
             currentFocusNode.pages = [...result.node.pages];
           }
-          
+
           if (result.node.conceptList) {
             currentFocusNode.conceptList = [...result.node.conceptList];
           }
-          
+
           // ✅ MOST IMPORTANT: Update children array
           if (result.node.children) {
             console.log('🔄 Updating children array from backend response');
             console.log('  - Backend returned children count:', result.node.children.length);
-            
+
             // Create new child objects and restore parent references
             currentFocusNode.children = result.node.children.map(backendChild => {
               const childNode = {
@@ -666,22 +783,22 @@ app.whenReady().then(async () => {
               };
               return childNode;
             });
-            
+
             console.log('✅ Children array updated successfully');
             console.log('  - New children count:', currentFocusNode.children.length);
             console.log('  - Children titles:', currentFocusNode.children.map(c => c.title));
           }
-          
+
           // Update answer for bigDaddyNode
           if (result.node.answer !== undefined && 'answer' in currentFocusNode) {
             currentFocusNode.answer = result.node.answer;
           }
-  
+
           // ✅ CRITICAL: Update the global den data if this is the root node
           console.log('🔍 Debug: currentFocusNode === currentDenData?', currentFocusNode === currentDenData);
           console.log('🔍 Debug: currentFocusNode type:', currentFocusNode?.query ? 'bigDaddyNode' : 'babyNode');
           console.log('🔍 Debug: currentDenData type:', currentDenData?.query ? 'bigDaddyNode' : 'babyNode');
-          
+
           if (currentFocusNode === currentDenData) {
             console.log('🏠 Updated global den data (root node modified)');
             // currentDenData is already updated since it's the same reference
@@ -690,21 +807,25 @@ app.whenReady().then(async () => {
             console.log('👶 Updated baby node in parent structure');
             updateBabyNodeInDenData(currentFocusNode);
           }
-          
+
           // Always sync the central node (currentDenData) to backend
           try {
             console.log('🔄 Syncing central node with backend...');
             console.log('📊 Current den data children count:', currentDenData.children?.length || 0);
             console.log('📊 Current den data children:', currentDenData.children?.map(c => c.title) || []);
-            
+            console.log('📊 Children isDen status:', currentDenData.children?.map(c => ({ title: c.title, isDen: c.isDen })) || []);
+
+            const cleanDenData = cleanNodeForSerialization(currentDenData);
+            console.log('🧹 Cleaned node for serialization (removed circular references)');
+
             const updateResponse = await fetch('http://localhost:4000/update-central-node', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
               },
-              body: JSON.stringify({ node: currentDenData })
+              body: JSON.stringify({ node: cleanDenData })
             });
-            
+
             if (updateResponse.ok) {
               const responseData = await updateResponse.json();
               console.log('✅ Central node synced with backend');
@@ -712,22 +833,41 @@ app.whenReady().then(async () => {
             } else {
               const errorText = await updateResponse.text();
               console.warn('⚠️ Failed to sync central node with backend:', errorText);
+              console.warn('⚠️ Response status:', updateResponse.status);
             }
           } catch (error) {
             console.error('❌ Error syncing central node:', error);
+            console.error('❌ Error details:', error.message);
           }
-  
+
           console.log('🎯 AFTER processing - Focus node state:');
           console.log('  - Pages:', currentFocusNode.pages?.length || 0);
           console.log('  - Concepts:', currentFocusNode.conceptList?.length || 0);
           console.log('  - Children:', currentFocusNode.children?.length || 0);
           console.log('  - Children details:', currentFocusNode.children?.map(c => c.title) || []);
+          console.log('  - Is Den:', currentFocusNode.isDen || false);
+          console.log('  - Focus node ID:', currentFocusNode === currentDenData ? 'ROOT' : 'CHILD');
           
+          // 🔍 DETAILED DEBUG: Show exactly what changed
+          console.log('🔍 DETAILED CHANGES:');
+          console.log('  - New child nodes created:', result.child_nodes_created || 0);
+          console.log('  - Concepts added:', result.concepts_added || 0);
+          console.log('  - Concepts removed:', result.concepts_removed || 0);
+          
+          // Show the new children that were added
+          if (result.child_nodes_created > 0 && currentFocusNode.children) {
+            console.log('🆕 NEW CHILDREN ADDED TO FOCUS NODE:');
+            const newChildren = currentFocusNode.children.slice(-result.child_nodes_created);
+            newChildren.forEach((child, index) => {
+              console.log(`  ${index + 1}. "${child.title}" (score: ${child.comparisonScore || 'N/A'})`);
+            });
+          }
+
           console.log('📈 Processing Statistics:');
           console.log('  - Concepts added:', result.concepts_added);
           console.log('  - Concepts removed:', result.concepts_removed);
           console.log('  - Child nodes created:', result.child_nodes_created);
-          
+
           // Detailed child node logging
           if (currentFocusNode.children && currentFocusNode.children.length > 0) {
             console.log('👶 Child nodes created:');
@@ -735,13 +875,34 @@ app.whenReady().then(async () => {
               console.log(`  ${index + 1}. "${child.title}" (score: ${child.comparisonScore || 'N/A'})`);
             });
           }
+
+          // ✅ CRITICAL: Refresh the graph after successful page addition
+          try {
+            console.log('🔄 Refreshing graph after page addition...');
+            await win.webContents.executeJavaScript(`
+              // Check if we're on the graph page
+              if (window.location.pathname === '/graph' || window.location.pathname === '/') {
+                // If loadGraphData function exists, call it
+                if (typeof loadGraphData === 'function') {
+                  loadGraphData();
+                  console.log('✅ Graph refreshed via loadGraphData');
+                } else {
+                  // Fallback: reload the page
+                  window.location.reload();
+                  console.log('✅ Graph refreshed via page reload');
+                }
+              }
+            `);
+          } catch (error) {
+            console.error('❌ Error refreshing graph:', error);
+          }
         }
       } else {
         console.error('❌ Failed to send page to den:', response.status);
         if (result.error) {
           console.error('❌ Error details:', result.error);
         }
-        
+
         // Update popup to show error
         try {
           await win.webContents.executeJavaScript(`
@@ -768,7 +929,7 @@ app.whenReady().then(async () => {
       }
     } catch (error) {
       console.error('❌ Error sending page to den:', error);
-      
+
       // Update popup to show error
       try {
         await win.webContents.executeJavaScript(`
@@ -794,9 +955,158 @@ app.whenReady().then(async () => {
       }
     }
   });
+  
+  console.log('🔍 DEBUG: Ctrl+D shortcut registered:', ctrlDRegistered);
+
+  // Test shortcut to verify global shortcuts are working
+  globalShortcut.register('Alt+T', () => {
+    console.log('🧪 TEST: Alt+T pressed - Global shortcuts are working!');
+  });
 
   globalShortcut.register('CommandOrControl+Left', async () => {
     console.log('🎯 Ctrl+Left pressed in Electron!');
+
+    // Check if we're in a burrow session first
+    if (currentBurrowSession) {
+      lastUrl = undefined;
+
+      console.log('🕳️ Handling burrow navigation (previous)...');
+
+      // Show loading popup immediately
+      try {
+        await win.webContents.executeJavaScript(`
+          // Remove existing popup if it exists
+          const existingPopup = document.getElementById('burrow-loading-popup');
+          if (existingPopup) {
+            existingPopup.remove();
+          }
+          
+          // Create burrow loading popup
+          const popup = document.createElement('div');
+          popup.id = 'burrow-loading-popup';
+          popup.style.cssText = \`
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 140px;
+            height: 60px;
+            background: rgba(59, 130, 246, 0.9);
+            color: white;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 2147483647;
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            animation: slideInRight 0.3s ease-out;
+          \`;
+          
+          // Add CSS animation
+          const style = document.createElement('style');
+          style.textContent = \`
+            @keyframes slideInRight {
+              from { transform: translateX(100%); opacity: 0; }
+              to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOutRight {
+              from { transform: translateX(0); opacity: 1; }
+              to { transform: translateX(100%); opacity: 0; }
+            }
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          \`;
+          document.head.appendChild(style);
+          
+          // Create loading content
+          popup.innerHTML = \`
+            <div style="width: 20px; height: 20px; border: 2px solid #ffffff40; border-top: 2px solid #ffffff; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 8px;"></div>
+            <div style="text-align: center;">Burrowing...</div>
+          \`;
+          
+          // Add to page
+          document.body.appendChild(popup);
+        `);
+      } catch (error) {
+        console.error('Error showing burrow loading popup:', error);
+      }
+
+      try {
+        console.log('🔄 Navigating to previous page in burrow session...');
+        const response = await fetch(`http://localhost:4000/burrow/${currentBurrowSession}/navigate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ direction: 'prev' })
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          const newUrl = result.currentPage.url;
+          console.log('✅ Navigated to previous burrow page!');
+          console.log('📍 New URL:', newUrl);
+
+          // Update page counter state
+          currentPageIndex = result.burrowState.currentIndex;
+          totalPages = result.burrowState.pages.length;
+
+          // Remove loading popup
+          try {
+            await win.webContents.executeJavaScript(`
+              const popup = document.getElementById('burrow-loading-popup');
+              if (popup) {
+                popup.style.animation = 'slideOutRight 0.3s ease-out';
+                setTimeout(() => popup.remove(), 300);
+              }
+            `);
+          } catch (error) {
+            console.error('Error removing burrow popup:', error);
+          }
+
+          // Update page counter
+          await updatePageCounter();
+
+          // Navigate the Electron window to the new URL
+          win.loadURL(newUrl);
+        } else {
+          console.error('❌ Failed to navigate burrow session:', response.status);
+
+          // Remove loading popup on error
+          try {
+            await win.webContents.executeJavaScript(`
+              const popup = document.getElementById('burrow-loading-popup');
+              if (popup) {
+                popup.style.animation = 'slideOutRight 0.3s ease-out';
+                setTimeout(() => popup.remove(), 300);
+              }
+            `);
+          } catch (error) {
+            console.error('Error removing burrow popup:', error);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error navigating burrow session:', error);
+
+        // Remove loading popup on error
+        try {
+          await win.webContents.executeJavaScript(`
+            const popup = document.getElementById('burrow-loading-popup');
+            if (popup) {
+              popup.style.animation = 'slideOutRight 0.3s ease-out';
+              setTimeout(() => popup.remove(), 300);
+            }
+          `);
+        } catch (popupError) {
+          console.error('Error removing burrow popup:', popupError);
+        }
+      }
+
+      return;
+    }
 
     // Show loading popup immediately
     try {
@@ -906,7 +1216,7 @@ app.whenReady().then(async () => {
         win.loadURL(newUrl);
       } else {
         console.error('❌ Failed to navigate hop session:', response.status);
-        
+
         // Remove loading popup on error
         try {
           await win.webContents.executeJavaScript(`
@@ -922,7 +1232,7 @@ app.whenReady().then(async () => {
       }
     } catch (error) {
       console.error('❌ Error navigating hop session:', error);
-      
+
       // Remove loading popup on error
       try {
         await win.webContents.executeJavaScript(`
@@ -940,6 +1250,146 @@ app.whenReady().then(async () => {
 
   globalShortcut.register('CommandOrControl+Right', async () => {
     console.log('🎯 Ctrl+Right pressed in Electron!');
+
+    // Check if we're in a burrow session first
+    if (currentBurrowSession) {
+      console.log('🕳️ Handling burrow navigation (next)...');
+
+      // Show loading popup immediately
+      try {
+        await win.webContents.executeJavaScript(`
+          // Remove existing popup if it exists
+          const existingPopup = document.getElementById('burrow-loading-popup');
+          if (existingPopup) {
+            existingPopup.remove();
+          }
+          
+          // Create burrow loading popup
+          const popup = document.createElement('div');
+          popup.id = 'burrow-loading-popup';
+          popup.style.cssText = \`
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 140px;
+            height: 60px;
+            background: rgba(59, 130, 246, 0.9);
+            color: white;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 2147483647;
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            animation: slideInRight 0.3s ease-out;
+          \`;
+          
+          // Add CSS animation
+          const style = document.createElement('style');
+          style.textContent = \`
+            @keyframes slideInRight {
+              from { transform: translateX(100%); opacity: 0; }
+              to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOutRight {
+              from { transform: translateX(0); opacity: 1; }
+              to { transform: translateX(100%); opacity: 0; }
+            }
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          \`;
+          document.head.appendChild(style);
+          
+          // Create loading content
+          popup.innerHTML = \`
+            <div style="width: 20px; height: 20px; border: 2px solid #ffffff40; border-top: 2px solid #ffffff; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 8px;"></div>
+            <div style="text-align: center;">Burrowing...</div>
+          \`;
+          
+          // Add to page
+          document.body.appendChild(popup);
+        `);
+      } catch (error) {
+        console.error('Error showing burrow loading popup:', error);
+      }
+
+      try {
+        console.log('🔄 Navigating to next page in burrow session...');
+        const response = await fetch(`http://localhost:4000/burrow/${currentBurrowSession}/navigate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ direction: 'next' })
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          const newUrl = result.currentPage.url;
+          console.log('✅ Navigated to next burrow page!');
+          console.log('📍 New URL:', newUrl);
+
+          // Update page counter state
+          currentPageIndex = result.burrowState.currentIndex;
+          totalPages = result.burrowState.pages.length;
+
+          // Remove loading popup
+          try {
+            await win.webContents.executeJavaScript(`
+              const popup = document.getElementById('burrow-loading-popup');
+              if (popup) {
+                popup.style.animation = 'slideOutRight 0.3s ease-out';
+                setTimeout(() => popup.remove(), 300);
+              }
+            `);
+          } catch (error) {
+            console.error('Error removing burrow popup:', error);
+          }
+
+          // Update page counter
+          await updatePageCounter();
+
+          // Navigate the Electron window to the new URL
+          win.loadURL(newUrl);
+        } else {
+          console.error('❌ Failed to navigate burrow session:', response.status);
+
+          // Remove loading popup on error
+          try {
+            await win.webContents.executeJavaScript(`
+              const popup = document.getElementById('burrow-loading-popup');
+              if (popup) {
+                popup.style.animation = 'slideOutRight 0.3s ease-out';
+                setTimeout(() => popup.remove(), 300);
+              }
+            `);
+          } catch (error) {
+            console.error('Error removing burrow popup:', error);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error navigating burrow session:', error);
+
+        // Remove loading popup on error
+        try {
+          await win.webContents.executeJavaScript(`
+            const popup = document.getElementById('burrow-loading-popup');
+            if (popup) {
+              popup.style.animation = 'slideOutRight 0.3s ease-out';
+              setTimeout(() => popup.remove(), 300);
+            }
+          `);
+        } catch (popupError) {
+          console.error('Error removing burrow popup:', popupError);
+        }
+      }
+
+      return;
+    }
 
     // Show loading popup immediately
     try {
@@ -1049,7 +1499,7 @@ app.whenReady().then(async () => {
         win.loadURL(newUrl);
       } else {
         console.error('❌ Failed to navigate hop session:', response.status);
-        
+
         // Remove loading popup on error
         try {
           await win.webContents.executeJavaScript(`
@@ -1065,7 +1515,7 @@ app.whenReady().then(async () => {
       }
     } catch (error) {
       console.error('❌ Error navigating hop session:', error);
-      
+
       // Remove loading popup on error
       try {
         await win.webContents.executeJavaScript(`
@@ -1080,6 +1530,7 @@ app.whenReady().then(async () => {
       }
     }
   })
+
 
   createWindow();
 })

@@ -109,6 +109,7 @@ export async function sendToDen(
           pages: [url],
           conceptList: [concept],
           denned: false,
+          isDen: false, // Default to false - can be set to true when burrowing
           parent: null, // Set to null initially to avoid circular refs during processing
           children: [],
           comparisonScore: comparisonScore / 100
