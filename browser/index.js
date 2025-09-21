@@ -318,9 +318,124 @@ app.whenReady().then(async () => {
     const currentUrl = win.webContents.getURL();
     console.log('📤 Current URL:', currentUrl);
   
+    // Show popup immediately in the webview
+    try {
+      await win.webContents.executeJavaScript(`
+        // Remove existing popup if it exists
+        const existingPopup = document.getElementById('send-to-den-popup');
+        if (existingPopup) {
+          existingPopup.remove();
+        }
+        
+        // Create popup element
+        const popup = document.createElement('div');
+        popup.id = 'send-to-den-popup';
+        popup.style.cssText = \`
+          position: fixed;
+          top: 20px;
+          left: 20px;
+          width: 350px;
+          background: white;
+          border: 2px solid #007bff;
+          border-radius: 8px;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+          z-index: 2147483647;
+          font-family: Arial, sans-serif;
+          animation: slideDown 0.3s ease-out;
+        \`;
+        
+        // Add CSS animation
+        const style = document.createElement('style');
+        style.textContent = \`
+          @keyframes slideDown {
+            from { transform: translateY(-100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+          }
+          @keyframes slideUp {
+            from { transform: translateY(0); opacity: 1; }
+            to { transform: translateY(-100%); opacity: 0; }
+          }
+        \`;
+        document.head.appendChild(style);
+        
+        // Create popup content
+        popup.innerHTML = \`
+          <div style="padding: 15px; border-bottom: 1px solid #eee; background: #f8f9fa; border-radius: 6px 6px 0 0; display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin: 0; font-size: 16px; color: #333; display: flex; align-items: center;">
+              <span style="margin-right: 8px;">📤</span>
+              Send to Den
+            </h3>
+            <button id="popup-close" style="background: none; border: none; font-size: 20px; cursor: pointer; color: #666; padding: 0; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 4px;">&times;</button>
+          </div>
+          <div id="popup-content" style="padding: 15px; color: #555;">
+            <p style="margin: 0 0 10px 0; display: flex; align-items: center;">
+              <span id="status-indicator" style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; background: #ffc107; animation: pulse 1s infinite;"></span>
+              Processing page...
+            </p>
+            <p style="margin: 0; font-size: 14px;">Adding current page to your knowledge den.</p>
+          </div>
+        \`;
+        
+        // Add pulse animation for processing indicator
+        const pulseStyle = document.createElement('style');
+        pulseStyle.textContent = \`
+          @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+          }
+        \`;
+        document.head.appendChild(pulseStyle);
+        
+        // Add to page
+        document.body.appendChild(popup);
+        
+        // Close button functionality
+        document.getElementById('popup-close').onclick = function() {
+          popup.style.animation = 'slideUp 0.3s ease-out';
+          setTimeout(() => popup.remove(), 300);
+        };
+        
+        // Auto-close after 5 seconds
+        setTimeout(() => {
+          if (document.getElementById('send-to-den-popup')) {
+            popup.style.animation = 'slideUp 0.3s ease-out';
+            setTimeout(() => popup.remove(), 300);
+          }
+        }, 5000);
+        
+        console.log('🎭 Popup created and displayed');
+      `);
+    } catch (error) {
+      console.error('Error showing popup:', error);
+    }
+  
     try {
       if (!currentFocusNode) {
         console.log('❌ No focus node available. Please search first to create a den.');
+        // Update popup to show error
+        try {
+          await win.webContents.executeJavaScript(`
+            const popup = document.getElementById('send-to-den-popup');
+            if (popup) {
+              const content = document.getElementById('popup-content');
+              const indicator = document.getElementById('status-indicator');
+              if (content && indicator) {
+                indicator.style.background = '#dc3545';
+                indicator.style.animation = 'none';
+                content.innerHTML = \`
+                  <p style="margin: 0 0 10px 0; display: flex; align-items: center;">
+                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; background: #dc3545;"></span>
+                    No focus node available
+                  </p>
+                  <p style="margin: 0; font-size: 14px;">Please search first to create a den.</p>
+                \`;
+              }
+            }
+          `);
+        } catch (error) {
+          console.error('Error updating popup:', error);
+        }
         return;
       }
   
@@ -347,6 +462,30 @@ app.whenReady().then(async () => {
   
       if (response.ok && result.success) {
         console.log('✅ Page sent to den successfully!');
+        
+        // Update popup to show success
+        try {
+          await win.webContents.executeJavaScript(`
+            const popup = document.getElementById('send-to-den-popup');
+            if (popup) {
+              const content = document.getElementById('popup-content');
+              const indicator = document.getElementById('status-indicator');
+              if (content && indicator) {
+                indicator.style.background = '#28a745';
+                indicator.style.animation = 'none';
+                content.innerHTML = \`
+                  <p style="margin: 0 0 10px 0; display: flex; align-items: center;">
+                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; background: #28a745;"></span>
+                    Page sent to den successfully!
+                  </p>
+                  <p style="margin: 0; font-size: 14px;">Concepts added: ${result.concepts_added || 0}, Child nodes created: ${result.child_nodes_created || 0}</p>
+                \`;
+              }
+            }
+          `);
+        } catch (error) {
+          console.error('Error updating popup:', error);
+        }
   
         // ✅ CRITICAL FIX: Properly sync the modified node back to local state
         if (result.node) {
@@ -452,9 +591,57 @@ app.whenReady().then(async () => {
         if (result.error) {
           console.error('❌ Error details:', result.error);
         }
+        
+        // Update popup to show error
+        try {
+          await win.webContents.executeJavaScript(`
+            const popup = document.getElementById('send-to-den-popup');
+            if (popup) {
+              const content = document.getElementById('popup-content');
+              const indicator = document.getElementById('status-indicator');
+              if (content && indicator) {
+                indicator.style.background = '#dc3545';
+                indicator.style.animation = 'none';
+                content.innerHTML = \`
+                  <p style="margin: 0 0 10px 0; display: flex; align-items: center;">
+                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; background: #dc3545;"></span>
+                    Failed to send page to den
+                  </p>
+                  <p style="margin: 0; font-size: 14px;">Status: ${response.status}${result.error ? ', Error: ' + JSON.stringify(result.error) : ''}</p>
+                \`;
+              }
+            }
+          `);
+        } catch (error) {
+          console.error('Error updating popup:', error);
+        }
       }
     } catch (error) {
       console.error('❌ Error sending page to den:', error);
+      
+      // Update popup to show error
+      try {
+        await win.webContents.executeJavaScript(`
+          const popup = document.getElementById('send-to-den-popup');
+          if (popup) {
+            const content = document.getElementById('popup-content');
+            const indicator = document.getElementById('status-indicator');
+            if (content && indicator) {
+              indicator.style.background = '#dc3545';
+              indicator.style.animation = 'none';
+              content.innerHTML = \`
+                <p style="margin: 0 0 10px 0; display: flex; align-items: center;">
+                  <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; background: #dc3545;"></span>
+                  Error sending page to den
+                </p>
+                <p style="margin: 0; font-size: 14px;">${error.message || 'Unknown error occurred'}</p>
+              \`;
+            }
+          }
+        `);
+      } catch (modalError) {
+        console.error('Error updating popup:', modalError);
+      }
     }
   });
 

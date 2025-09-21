@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Modal Test</title>
+  <style>
+    body { 
+      margin: 0; 
+      font-family: Arial, sans-serif; 
+      background: #f0f0f0;
+      padding: 20px;
+    }
+    
+    .test-button {
+      padding: 15px 30px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 10px;
+    }
+    
+    /* Modal Styles */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.3);
+      z-index: 9999;
+      display: none;
+    }
+    
+    .modal {
+      position: fixed;
+      top: -400px;
+      left: 20px;
+      width: 400px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      z-index: 10000;
+      transition: top 0.4s ease-in-out, opacity 0.4s ease-in-out;
+      border: 1px solid #ddd;
+      opacity: 0;
+      pointer-events: none;
+    }
+    
+    .modal.show {
+      top: 20px;
+      opacity: 1;
+      pointer-events: auto;
+    }
+    
+    .modal-header {
+      padding: 15px 20px;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #f8f9fa;
+      border-radius: 8px 8px 0 0;
+    }
+    
+    .modal-title {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+      color: #333;
+    }
+    
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      color: #666;
+      padding: 0;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      transition: background-color 0.2s;
+    }
+    
+    .modal-close:hover {
+      background-color: #e9ecef;
+      color: #333;
+    }
+    
+    .modal-body {
+      padding: 20px;
+      color: #555;
+      line-height: 1.5;
+    }
+    
+    .status-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+    
+    .status-success {
+      background-color: #28a745;
+    }
+    
+    .status-error {
+      background-color: #dc3545;
+    }
+    
+    .status-processing {
+      background-color: #ffc107;
+      animation: pulse 1s infinite;
+    }
+    
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.5; }
+      100% { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Modal Test Page</h1>
+  <p>This page tests the modal functionality independently.</p>
+  
+  <button class="test-button" onclick="showModal()">Show Modal</button>
+  <button class="test-button" onclick="testSuccess()">Test Success</button>
+  <button class="test-button" onclick="testError()">Test Error</button>
+  
+  <!-- Modal for testing -->
+  <div class="modal-overlay" id="modalOverlay"></div>
+  <div class="modal" id="sendToDenModal">
+    <div class="modal-header">
+      <h3 class="modal-title">
+        <span>📤</span>
+        Send to Den
+      </h3>
+      <button class="modal-close" id="modalClose">&times;</button>
+    </div>
+    <div class="modal-body" id="modalBody">
+      <div id="modalContent">
+        <p><span class="status-indicator status-processing"></span>Processing page...</p>
+        <p>Adding current page to your knowledge den.</p>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // Modal elements
+    const modalOverlay = document.getElementById('modalOverlay')
+    const sendToDenModal = document.getElementById('sendToDenModal')
+    const modalClose = document.getElementById('modalClose')
+    const modalContent = document.getElementById('modalContent')
+
+    // Debug: Check if elements exist
+    console.log('🎭 Modal elements found:')
+    console.log('  - modalOverlay:', !!modalOverlay)
+    console.log('  - sendToDenModal:', !!sendToDenModal)
+    console.log('  - modalClose:', !!modalClose)
+    console.log('  - modalContent:', !!modalContent)
+
+    // Modal functions
+    function showModal() {
+      console.log('🎭 Showing modal...')
+      modalOverlay.style.display = 'block'
+      // Force a reflow to ensure the modal is positioned correctly before animation
+      sendToDenModal.offsetHeight
+      sendToDenModal.classList.add('show')
+      console.log('🎭 Modal should now be visible')
+    }
+
+    function hideModal() {
+      console.log('🎭 Hiding modal...')
+      sendToDenModal.classList.remove('show')
+      setTimeout(() => {
+        modalOverlay.style.display = 'none'
+        console.log('🎭 Modal hidden')
+      }, 400) // Wait for animation to complete (matches CSS transition duration)
+    }
+
+    function updateModalContent(status, message, details = '') {
+      const statusClass = status === 'success' ? 'status-success' : 
+                         status === 'error' ? 'status-error' : 'status-processing'
+      
+      modalContent.innerHTML = `
+        <p><span class="status-indicator ${statusClass}"></span>${message}</p>
+        ${details ? `<p>${details}</p>` : ''}
+      `
+    }
+
+    function testSuccess() {
+      showModal()
+      updateModalContent('success', 'Test successful!', 'This is a success message.')
+    }
+
+    function testError() {
+      showModal()
+      updateModalContent('error', 'Test error!', 'This is an error message.')
+    }
+
+    // Modal event listeners
+    modalClose.addEventListener('click', hideModal)
+    modalOverlay.addEventListener('click', hideModal)
+
+    // Close modal on Escape key
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && sendToDenModal.classList.contains('show')) {
+        hideModal()
+      }
+    })
+  </script>
+</body>
+</html>
