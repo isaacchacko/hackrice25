@@ -38,10 +38,10 @@ export async function sendToDen(
       };
     }
 
-    // Check if URL is already in the pages list
-    const urlAlreadyExists = node.pages.includes(url);
+    // Check if URL is already in the denPages list
+    const urlAlreadyExists = 'denPages' in node ? (node.denPages?.includes(url) || false) : false;
     if (urlAlreadyExists) {
-      console.log('🔄 URL already exists in node, but will still extract concepts and create child nodes');
+      console.log('🔄 URL already exists in denPages, but will still extract concepts and create child nodes');
     }
 
     // Extract concepts from the URL
@@ -147,12 +147,20 @@ export async function sendToDen(
     node.conceptList = simplifyResult.concepts;
     console.log(`🔄 Concept simplification complete. Removed ${conceptsRemoved} duplicates`);
     
-    // Add the URL to the node's pages list (only if it doesn't already exist)
-    if (!urlAlreadyExists) {
-      node.pages.push(url);
-      console.log(`📄 Added URL to pages list. Total pages: ${node.pages.length}`);
+    // Add the URL to the node's denPages list (only if it doesn't already exist)
+    if (!urlAlreadyExists && 'denPages' in node) {
+      // Initialize denPages array if it doesn't exist
+      if (!node.denPages) {
+        node.denPages = [];
+        console.log('🔧 Initialized denPages array');
+      }
+      node.denPages.push(url);
+      console.log(`📄 Added URL to denPages list. Total den pages: ${node.denPages.length}`);
+      console.log('📄 Current denPages:', node.denPages);
+    } else if ('denPages' in node) {
+      console.log(`📄 URL already in denPages list. Total den pages: ${node.denPages?.length || 0}`);
     } else {
-      console.log(`📄 URL already in pages list. Total pages: ${node.pages.length}`);
+      console.log('⚠️ Node does not have denPages property');
     }
 
     // If this is a bigDaddyNode, run get_answer after concepts and pages have been added
@@ -165,19 +173,20 @@ export async function sendToDen(
       console.log('  - Concepts count:', node.conceptList.length);
       
       try {
-        // Only regenerate answer if we have enough content (pages and concepts)
-        const hasEnoughContent = node.pages.length > 0 && node.conceptList.length > 0;
+        // Only regenerate answer if we have enough content (den pages and concepts)
+        const denPages = node.denPages || [];
+        const hasEnoughContent = denPages.length > 0 && node.conceptList.length > 0;
         
         if (hasEnoughContent) {
           // Generate a comprehensive general answer about the topic
           const generalQuestion = `Provide a comprehensive overview and explanation of "${node.query}". Include key concepts, important details, and relevant information.`;
           
           console.log('🤖 Generating answer with question:', generalQuestion);
-          console.log('📄 Using pages:', node.pages.slice(0, 3), '...');
+          console.log('📄 Using den pages:', denPages.slice(0, 3), '...');
           console.log('🧠 Using concepts:', node.conceptList.slice(0, 3), '...');
           
           const answerResult = await get_answer(
-            node.pages,           // URLs from the node's pageList
+            denPages,             // URLs only from den pages (what user added)
             node.conceptList,     // Concepts from the node's conceptList
             generalQuestion       // General question about the topic
           );

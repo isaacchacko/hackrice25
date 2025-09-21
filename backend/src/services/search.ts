@@ -92,6 +92,7 @@ export async function createCentralBigDaddyNode(query: string, pages: Page[]): P
   const bigDaddyNode: bigDaddyNode = {
     query: query,
     pages: pages.map(page => page.url),
+    denPages: [], // Pages added via Ctrl+D (den operations)
     conceptList: [], // Will be populated by other services
     children: [], // Will be populated by other services
     answer: `This is a knowledge graph about "${query}". The answer will be generated as more content is added to this node.` // Initial placeholder answer
@@ -99,38 +100,8 @@ export async function createCentralBigDaddyNode(query: string, pages: Page[]): P
   
   setCentralBigDaddyNode(bigDaddyNode);
   
-  // Generate an initial answer using the search results
-  try {
-    console.log('🤖 Generating initial answer for central node...');
-    console.log('📊 Query:', query);
-    console.log('📄 Pages count:', pages.length);
-    
-    if (pages.length > 0) {
-      const generalQuestion = `Provide a comprehensive overview and explanation of "${query}". Include key concepts, important details, and relevant information.`;
-      
-      const answerResult = await get_answer(
-        pages.map(page => page.url), // URLs from search results
-        [], // No concepts yet, will be populated later
-        generalQuestion
-      );
-
-      if (answerResult.success && answerResult.answer) {
-        bigDaddyNode.answer = answerResult.answer;
-        bigDaddyNode.shortAnswer = (typeof answerResult.shortAnswer === 'string' ? answerResult.shortAnswer : answerResult.answer.split(' ').slice(0, 5).join(' '));
-        console.log('✅ Successfully generated initial answer for central node');
-        console.log('📝 Short answer:', bigDaddyNode.shortAnswer);
-        console.log('📝 Full answer preview:', answerResult.answer.substring(0, 100) + '...');
-      } else {
-        console.warn(`⚠️ Failed to generate initial answer: ${answerResult.error}`);
-        // Keep the placeholder answer
-      }
-    } else {
-      console.log('📝 No pages available for answer generation');
-    }
-  } catch (error) {
-    console.error('❌ Error generating initial answer:', error);
-    // Keep the placeholder answer
-  }
+  // Don't generate initial answer - wait for den pages to be added
+  console.log('📝 Initial answer will be generated when pages are added to the den');
   
   return bigDaddyNode;
 }

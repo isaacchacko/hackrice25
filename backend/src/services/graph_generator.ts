@@ -11,6 +11,7 @@ export interface GraphNode {
     query?: string;
     title?: string;
     pages: string[];
+    denPages?: string[];
     conceptList: any[];
     comparisonScore?: number;
     denned?: boolean;
@@ -248,6 +249,7 @@ export function generateKnowledgeGraph(centralNode: bigDaddyNode): GraphResult {
         label: 'query' in node ? (node.shortAnswer && node.shortAnswer.trim() ? node.shortAnswer : node.query) : node.title,
         ...('query' in node ? { query: node.query } : { title: node.title }),
         pages: node.pages,
+        ...('denPages' in node ? { denPages: node.denPages } : {}),
         conceptList: node.conceptList,
         ...('comparisonScore' in node ? { comparisonScore: node.comparisonScore } : {}),
         ...('denned' in node ? { denned: node.denned } : {}),
@@ -257,6 +259,12 @@ export function generateKnowledgeGraph(centralNode: bigDaddyNode): GraphResult {
       position,
       style: getNodeStyle(node, level)
     };
+
+    // Debug logging for denPages
+    if ('query' in node && node.denPages) {
+      console.log(`🔍 Graph node ${nodeId} denPages:`, node.denPages);
+      console.log(`🔍 Graph node ${nodeId} denPages length:`, node.denPages.length);
+    }
 
     nodes.push(graphNode);
 

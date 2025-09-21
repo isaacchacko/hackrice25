@@ -103,6 +103,9 @@ const KnowledgeGraph: React.FC = () => {
   // Handle node click
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
     console.log('Node clicked:', node);
+    console.log('Node data:', node.data);
+    console.log('denPages:', node.data.denPages);
+    console.log('denPages length:', node.data.denPages?.length || 0);
     setSelectedNode(node);
     setShowPopup(true);
   }, []);
@@ -197,7 +200,7 @@ const KnowledgeGraph: React.FC = () => {
                     <div className={`w-3 h-3 rounded-full mr-2 ${selectedNode.type === 'bigDaddy' ? 'bg-pink-500' : 'bg-green-500'}`}></div>
                     {selectedNode.type === 'bigDaddy' ? 'Central Node' : 'Child Node'}
                   </span>
-                  <span>{selectedNode.data.pages?.length || 0} sources</span>
+                  <span>{selectedNode.data.denPages?.length || 0} den sources</span>
                   <span>{selectedNode.data.conceptList?.length || 0} concepts</span>
                 </div>
               </div>
@@ -247,14 +250,14 @@ const KnowledgeGraph: React.FC = () => {
               )}
               
               {/* Pages Used */}
-              {selectedNode.data.pages && selectedNode.data.pages.length > 0 && (
+              {selectedNode.data.denPages && selectedNode.data.denPages.length > 0 && (
                 <div>
                   <h4 className="text-lg font-semibold text-gray-300 mb-3 flex items-center">
                     <span className="mr-2">📚</span>
-                    Sources Used
+                    Sources Added to Den
                   </h4>
                   <div className="space-y-3 max-h-60 overflow-y-auto bg-gray-700 rounded-lg p-4">
-                    {selectedNode.data.pages.map((page: string, index: number) => (
+                    {selectedNode.data.denPages.map((page: string, index: number) => (
                       <div key={index} className="bg-gray-600 p-3 rounded-lg hover:bg-gray-500 transition-colors">
                         <a
                           href={page}

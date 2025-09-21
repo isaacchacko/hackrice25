@@ -9,6 +9,7 @@ export type concept = {
 export type babyNode = {
   title: string;
   pages: string[];
+  denPages?: string[]; // Pages added via Ctrl+D (den operations)
   conceptList: concept[];
   denned: boolean;
   parent: babyNode | bigDaddyNode | null;
@@ -19,6 +20,7 @@ export type babyNode = {
 export type bigDaddyNode = {
   query: string;
   pages: string[];
+  denPages?: string[]; // Pages added via Ctrl+D (den operations)
   conceptList: concept[];
   children: babyNode[];
   answer: string;

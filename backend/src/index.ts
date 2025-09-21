@@ -680,6 +680,12 @@ app.post('/send-to-den', async (req: Request, res: Response) => {
       console.log('  - Concepts removed:', result.concepts_removed);
       console.log('  - Child nodes created:', result.child_nodes_created);
       
+      // Update the central node if this is a bigDaddyNode
+      if (result.node && 'query' in result.node) {
+        setCentralBigDaddyNode(result.node as bigDaddyNode);
+        console.log('🏠 Updated central node with den pages');
+      }
+      
       // ✅ BETTER FIX: Clean only the parent references, keep everything else intact
       function cleanNodeForSerialization(obj: any): any {
         if (!obj || typeof obj !== 'object') return obj;
