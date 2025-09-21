@@ -216,7 +216,7 @@ app.post('/test-ctrl-d', async (req: Request, res: Response) => {
     console.log('🧪 Testing Ctrl+D operation with URL:', url);
     
     // Call sendToDen to process the URL
-    const result = await sendToDen(url, centralNode);
+    const result = await sendToDen(url, centralNode, centralNode.query);
     
     // Update the central node with the result
     if (result.node) {
@@ -753,7 +753,16 @@ app.post('/send-to-den', async (req: Request, res: Response) => {
     console.log('📤 URL to process:', url);
     console.log('🏠 Node title/query:', node.query || node.title);
 
-    const result = await sendToDen(url, node);
+    // Get the origin query from the central node
+    const centralNode = getCentralBigDaddyNode();
+    const originQuery = centralNode?.query || '';
+    
+    console.log(`🔍 DEBUG: /send-to-den endpoint:`);
+    console.log(`  - Central node exists: ${!!centralNode}`);
+    console.log(`  - Origin query: "${originQuery}"`);
+    console.log(`  - Target node: ${node.query || node.title}`);
+
+    const result = await sendToDen(url, node, originQuery);
     
     if (result.success) {
       console.log('✅ sendToDen completed successfully');
@@ -1033,15 +1042,25 @@ app.post('/burrow/:childNodeId/navigate', async (req: Request, res: Response) =>
     }
 
     const { navigateBurrow } = await import('./services/burrow_session.js');
+    console.log(`🔍 DEBUG: Attempting to navigate burrow session: ${childNodeId}`);
     const burrowState = navigateBurrow(childNodeId, direction);
     
     if (!burrowState) {
+      console.log(`❌ DEBUG: Burrow session not found for: ${childNodeId}`);
       return res.status(404).json({ error: 'Burrow session not found' });
     }
     
+    console.log(`✅ DEBUG: Burrow navigation successful for: ${childNodeId}`);
+    
     res.json({
       success: true,
-      burrowState,
+      burrowState: {
+        currentIndex: burrowState.currentIndex,
+        pages: burrowState.pages,
+        childTitle: burrowState.childTitle,
+        childNodeId: burrowState.childNodeId,
+        createdAt: burrowState.createdAt
+      },
       currentPage: burrowState.pages[burrowState.currentIndex]
     });
   } catch (error) {
@@ -1173,9 +1192,12 @@ app.post('/burrow/:childNodeId/add-page', async (req: Request, res: Response) =>
 
     console.log(`🕳️ Adding page to burrowed child node: "${childNodeId}"`);
     console.log(`📄 URL: ${url}`);
+    console.log(`🔍 DEBUG: /burrow/:childNodeId/add-page endpoint:`);
+    console.log(`  - Central node query: "${centralNode.query}"`);
+    console.log(`  - Child node title: "${childNode.title}"`);
 
     // Use sendToDen to process the page and add concepts as children to the burrowed node
-    const result = await sendToDen(url, childNode);
+    const result = await sendToDen(url, childNode, centralNode.query);
     
     if (result.success) {
       // Update the central node with the result

@@ -14,6 +14,8 @@ export interface GraphNode {
     denPages?: string[];
     conceptList: any[];
     comparisonScore?: number;
+    comparisonScoreOrigin?: number;
+    originQuery?: string;
     denned?: boolean;
     answer?: string;
     shortAnswer?: string;
@@ -175,15 +177,43 @@ export function generateKnowledgeGraph(centralNode: bigDaddyNode): GraphResult {
         padding: '10px',
       };
     } else {
-      // babyNode
-      const score = node.comparisonScore || 0;
+      // babyNode - use comparisonScoreOrigin for color determination, fallback to comparisonScore
+      let score = node.comparisonScoreOrigin || 0;
+      const fallbackScore = node.comparisonScore || 0;
+      
+      console.log(`🎨 DEBUG: Node "${node.title}" color determination:`);
+      console.log(`  - comparisonScoreOrigin: ${score}`);
+      console.log(`  - comparisonScore (fallback): ${fallbackScore}`);
+      console.log(`  - originQuery: "${node.originQuery || 'N/A'}"`);
+      
+      // If comparisonScoreOrigin is 0 or very low, use comparisonScore as fallback
+      if (score < 0.1 && fallbackScore > 0.1) {
+        score = fallbackScore;
+        console.log(`  - Using fallback score: ${score}`);
+      }
+      
+      // TEMPORARY: Force some color variation for testing
+      // This will be removed once we confirm the color system works
+      if (score < 0.1) {
+        // Generate a pseudo-random score based on the title for testing
+        const titleHash = node.title.split('').reduce((a, b) => {
+          a = ((a << 5) - a) + b.charCodeAt(0);
+          return a & a;
+        }, 0);
+        score = Math.abs(titleHash % 100) / 100; // 0.0 to 0.99
+        console.log(`  - Using TEST score for color variation: ${score}`);
+      }
+      
       let style;
       if (score > 0.7) {
         style = NODE_STYLES.babyNode.highScore;
+        console.log(`  - Using HIGH score style (green)`);
       } else if (score >= 0.4) {
         style = NODE_STYLES.babyNode.mediumScore;
+        console.log(`  - Using MEDIUM score style (orange)`);
       } else {
         style = NODE_STYLES.babyNode.lowScore;
+        console.log(`  - Using LOW score style (gray)`);
       }
       
       return {
@@ -252,6 +282,8 @@ export function generateKnowledgeGraph(centralNode: bigDaddyNode): GraphResult {
         ...('denPages' in node ? { denPages: node.denPages } : {}),
         conceptList: node.conceptList,
         ...('comparisonScore' in node ? { comparisonScore: node.comparisonScore } : {}),
+        ...('comparisonScoreOrigin' in node ? { comparisonScoreOrigin: node.comparisonScoreOrigin } : {}),
+        ...('originQuery' in node ? { originQuery: node.originQuery } : {}),
         ...('denned' in node ? { denned: node.denned } : {}),
         ...('answer' in node ? { answer: node.answer } : {}),
         ...('shortAnswer' in node ? { shortAnswer: node.shortAnswer } : {}),

@@ -16,6 +16,8 @@ export type babyNode = {
   parent: babyNode | bigDaddyNode | null;
   children: babyNode[];
   comparisonScore: number;
+  comparisonScoreOrigin: number; // Comparison score with the root query
+  originQuery: string; // The original query from the bigDaddyNode
 }
 
 export type bigDaddyNode = {
