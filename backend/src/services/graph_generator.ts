@@ -65,13 +65,16 @@ export interface GraphResult {
 
 // Configuration for the spider web layout
 const SPIDER_WEB_CONFIG = {
-  centerRadius: 80,           // Distance from center for first level (increased for better visibility)
-  levelSpacing: 100,          // Distance between levels (reduced for tighter layout)
+  centerRadius: 80,           // Distance from center for first level
+  levelSpacing: 120,          // Distance between levels (increased for better spacing)
   angleSpread: Math.PI * 2,   // Full circle spread
-  minDistance: 60,            // Minimum distance between nodes (reduced)
-  maxDistance: 200,           // Maximum distance from parent (reduced)
-  centerX: 500,               // Center X coordinate (moved to center of typical screen)
-  centerY: 400,               // Center Y coordinate (moved to center of typical screen)
+  minDistance: 80,            // Minimum distance between nodes (increased to prevent overlap)
+  maxDistance: 300,           // Maximum distance from parent (increased for better spread)
+  centerX: 500,               // Center X coordinate
+  centerY: 400,               // Center Y coordinate
+  nodeRadius: 40,             // Average node radius for collision detection
+  overlapThreshold: 90,       // Minimum distance between node centers
+  maxAttempts: 20,            // Maximum attempts to find non-overlapping position
 };
 
 // Color schemes for different node types and comparison scores
@@ -156,11 +159,64 @@ export function generateKnowledgeGraph(centralNode: bigDaddyNode): GraphResult {
     return id;
   }
 
-  // Calculate distance based on comparison score
-  function calculateDistance(comparisonScore: number, level: number): number {
+  // Calculate distance based on comparison score and child count
+  function calculateDistance(comparisonScore: number, level: number, childCount: number = 0, node: bigDaddyNode | babyNode): number {
     const baseDistance = SPIDER_WEB_CONFIG.centerRadius + (level * SPIDER_WEB_CONFIG.levelSpacing);
-    const scoreMultiplier = Math.max(0.4, comparisonScore); // Minimum 40% of base distance for better visibility
-    return Math.min(baseDistance * scoreMultiplier, SPIDER_WEB_CONFIG.maxDistance);
+    
+    // Adjust distance based on child count (more children = farther from center)
+    const childCountMultiplier = 1 + (childCount * 0.1); // 10% increase per child
+    
+    // Adjust distance based on relevance to origin (more relevant = closer to parent)
+    const relevanceScore = 'comparisonScoreOrigin' in node ? (node.comparisonScoreOrigin || 0) : comparisonScore;
+    // Invert the score: higher relevance = lower multiplier = closer distance
+    const relevanceMultiplier = Math.max(0.3, Math.min(1.0, 1.2 - relevanceScore));
+    
+    const finalDistance = baseDistance * childCountMultiplier * relevanceMultiplier;
+    return Math.min(Math.max(finalDistance, SPIDER_WEB_CONFIG.minDistance), SPIDER_WEB_CONFIG.maxDistance);
+  }
+
+  // Check if a position overlaps with existing nodes
+  function hasOverlap(newPos: { x: number; y: number }, existingNodes: GraphNode[]): boolean {
+    return existingNodes.some(node => {
+      const dx = newPos.x - node.position.x;
+      const dy = newPos.y - node.position.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      return distance < SPIDER_WEB_CONFIG.overlapThreshold;
+    });
+  }
+
+  // Find a non-overlapping position using spiral search
+  function findNonOverlappingPosition(
+    parentPos: { x: number; y: number },
+    baseDistance: number,
+    baseAngle: number,
+    existingNodes: GraphNode[]
+  ): { x: number; y: number } {
+    let attempts = 0;
+    let spiralRadius = 0;
+    let angle = baseAngle;
+    
+    while (attempts < SPIDER_WEB_CONFIG.maxAttempts) {
+      const testPos = {
+        x: parentPos.x + Math.cos(angle) * (baseDistance + spiralRadius),
+        y: parentPos.y + Math.sin(angle) * (baseDistance + spiralRadius)
+      };
+      
+      if (!hasOverlap(testPos, existingNodes)) {
+        return testPos;
+      }
+      
+      // Spiral outward and rotate
+      spiralRadius += 20;
+      angle += Math.PI / 4; // 45 degree increments
+      attempts++;
+    }
+    
+    // If we can't find a non-overlapping position, return the original
+    return {
+      x: parentPos.x + Math.cos(baseAngle) * baseDistance,
+      y: parentPos.y + Math.sin(baseAngle) * baseDistance
+    };
   }
 
   // Get node style based on type and comparison score
@@ -260,15 +316,19 @@ export function generateKnowledgeGraph(centralNode: bigDaddyNode): GraphResult {
         y: SPIDER_WEB_CONFIG.centerY
       };
     } else {
-      // Child node - calculate position based on parent and comparison score
+      // Child node - calculate position based on parent, comparison score, and child count
       const comparisonScore = 'comparisonScore' in node ? node.comparisonScore : 1.0;
-      const distance = calculateDistance(comparisonScore, level);
+      const childCount = 'children' in node ? node.children.length : 0;
+      const distance = calculateDistance(comparisonScore, level, childCount, node);
       
-      // Calculate position in a circle around parent with even distribution
-      position = {
+      // Calculate base position in a circle around parent
+      const basePosition = {
         x: parentPosition!.x + Math.cos(angle) * distance,
         y: parentPosition!.y + Math.sin(angle) * distance
       };
+      
+      // Use collision detection to find non-overlapping position
+      position = findNonOverlappingPosition(basePosition, distance, angle, nodes);
     }
 
     // Create the graph node
@@ -318,11 +378,30 @@ export function generateKnowledgeGraph(centralNode: bigDaddyNode): GraphResult {
 
     // Process children recursively
     if ('children' in node && node.children.length > 0) {
-      const angleStep = SPIDER_WEB_CONFIG.angleSpread / node.children.length;
+      // Sort children by relevance to origin for better positioning
+      const sortedChildren = [...node.children].sort((a, b) => {
+        const scoreA = a.comparisonScoreOrigin || a.comparisonScore || 0;
+        const scoreB = b.comparisonScoreOrigin || b.comparisonScore || 0;
+        return scoreB - scoreA; // Higher scores first
+      });
       
-      node.children.forEach((child, index) => {
-        // Calculate angle for even distribution around parent
-        const childAngle = angle + (index * angleStep) - (SPIDER_WEB_CONFIG.angleSpread / 2) + (angleStep / 2);
+      // Use adaptive angle distribution based on number of children
+      let angleStep: number;
+      let startAngle: number;
+      
+      if (node.children.length <= 6) {
+        // For few children, use full circle
+        angleStep = SPIDER_WEB_CONFIG.angleSpread / node.children.length;
+        startAngle = angle - (SPIDER_WEB_CONFIG.angleSpread / 2) + (angleStep / 2);
+      } else {
+        // For many children, use a smaller spread to avoid overcrowding
+        const maxSpread = Math.PI * 1.5; // 270 degrees instead of 360
+        angleStep = maxSpread / node.children.length;
+        startAngle = angle - (maxSpread / 2) + (angleStep / 2);
+      }
+      
+      sortedChildren.forEach((child, index) => {
+        const childAngle = startAngle + (index * angleStep);
         processNode(child, nodeId, level + 1, childAngle, position);
       });
     }
