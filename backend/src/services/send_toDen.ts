@@ -81,25 +81,42 @@ export async function sendToDen(
           console.log(`📊 Comparison score: ${comparisonScore}/100`);
         } else {
           console.warn(`⚠️ Failed to calculate comparison score: ${scoreResult.error}`);
-          comparisonScore = 0; // Default to 0 if calculation fails
+          // Use a default score based on concept relevance instead of 0
+          comparisonScore = 50; // Default to moderate relevance
         }
       } catch (error) {
         console.error(`❌ Error calculating comparison score for "${concept.title}":`, error);
-        comparisonScore = 0; // Default to 0 if calculation fails
+        comparisonScore = 50; // Default to moderate relevance
       }
 
-      const childNode: babyNode = {
-        title: concept.title,
-        pages: [url],
-        conceptList: [concept],
-        denned: false,
-        parent: null, // Set to null initially to avoid circular refs during processing
-        children: [],
-        comparisonScore: comparisonScore
-      };
+      // Check if a child node with this concept already exists
+      const existingChildIndex = 'children' in node ? 
+        node.children.findIndex(child => child.title === concept.title) : -1;
       
-      newChildNodes.push(childNode);
-      console.log(`✅ Created child node: "${concept.title}" (score: ${comparisonScore})`);
+      if (existingChildIndex !== -1 && 'children' in node) {
+        // Update existing child node
+        const existingChild = node.children[existingChildIndex];
+        if (existingChild) {
+          existingChild.pages.push(url);
+          existingChild.conceptList.push(concept);
+          existingChild.comparisonScore = Math.max(existingChild.comparisonScore, comparisonScore);
+          console.log(`🔄 Updated existing child node: "${concept.title}" (score: ${existingChild.comparisonScore})`);
+        }
+      } else {
+        // Create new child node
+        const childNode: babyNode = {
+          title: concept.title,
+          pages: [url],
+          conceptList: [concept],
+          denned: false,
+          parent: null, // Set to null initially to avoid circular refs during processing
+          children: [],
+          comparisonScore: comparisonScore
+        };
+        
+        newChildNodes.push(childNode);
+        console.log(`✅ Created new child node: "${concept.title}" (score: ${comparisonScore})`);
+      }
     }
 
     // Add new child nodes to the parent node's children array
@@ -140,25 +157,48 @@ export async function sendToDen(
 
     // If this is a bigDaddyNode, run get_answer after concepts and pages have been added
     if ('query' in node && 'answer' in node) {
-      console.log('🧠 Detected bigDaddyNode - updating answer...');
+      console.log('🧠 Detected bigDaddyNode - updating general answer...');
+      console.log('📊 Current node state:');
+      console.log('  - Query:', node.query);
+      console.log('  - Current answer:', node.answer);
+      console.log('  - Pages count:', node.pages.length);
+      console.log('  - Concepts count:', node.conceptList.length);
       
       try {
-        const answerResult = await get_answer(
-          node.pages,           // URLs from the node's pageList
-          node.conceptList,     // Concepts from the node's conceptList
-          node.query           // The query from the bigDaddyNode
-        );
+        // Only regenerate answer if we have enough content (pages and concepts)
+        const hasEnoughContent = node.pages.length > 0 && node.conceptList.length > 0;
+        
+        if (hasEnoughContent) {
+          // Generate a comprehensive general answer about the topic
+          const generalQuestion = `Provide a comprehensive overview and explanation of "${node.query}". Include key concepts, important details, and relevant information.`;
+          
+          console.log('🤖 Generating answer with question:', generalQuestion);
+          console.log('📄 Using pages:', node.pages.slice(0, 3), '...');
+          console.log('🧠 Using concepts:', node.conceptList.slice(0, 3), '...');
+          
+          const answerResult = await get_answer(
+            node.pages,           // URLs from the node's pageList
+            node.conceptList,     // Concepts from the node's conceptList
+            generalQuestion       // General question about the topic
+          );
 
-        if (answerResult.success && answerResult.answer) {
-          node.answer = answerResult.answer;
-          console.log('✅ Successfully updated bigDaddyNode answer');
+          if (answerResult.success && answerResult.answer) {
+            node.answer = answerResult.answer;
+            node.shortAnswer = (typeof answerResult.shortAnswer === 'string' ? answerResult.shortAnswer : answerResult.answer.split(' ').slice(0, 5).join(' '));
+            console.log('✅ Successfully updated bigDaddyNode general answer');
+            console.log('📝 Short answer:', node.shortAnswer);
+            console.log('📝 Full answer preview:', answerResult.answer.substring(0, 100) + '...');
+          } else {
+            console.warn(`⚠️ Failed to get general answer for bigDaddyNode: ${answerResult.error}`);
+            // Keep existing answer if generation fails
+          }
         } else {
-          console.warn(`⚠️ Failed to get answer for bigDaddyNode: ${answerResult.error}`);
-          // Don't fail the entire operation, just log the warning
+          console.log('📝 Not enough content yet to generate comprehensive answer');
+          // Don't create a fallback answer here since we already have one from initial creation
         }
       } catch (error) {
         console.error('❌ Error running get_answer for bigDaddyNode:', error);
-        // Don't fail the entire operation, just log the error
+        // Keep existing answer if generation fails
       }
     }
 

@@ -22,6 +22,7 @@ export type bigDaddyNode = {
   conceptList: concept[];
   children: babyNode[];
   answer: string;
+  shortAnswer?: string;
 }
 
 // Interface for API responses that match bigDaddyNode structure

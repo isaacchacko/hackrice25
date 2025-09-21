@@ -15,6 +15,7 @@ export interface GraphNode {
     comparisonScore?: number;
     denned?: boolean;
     answer?: string;
+    shortAnswer?: string;
   };
   position: {
     x: number;
@@ -244,14 +245,14 @@ export function generateKnowledgeGraph(centralNode: bigDaddyNode): GraphResult {
       id: nodeId,
       type: 'query' in node ? 'bigDaddy' : 'babyNode',
       data: {
-        label: 'query' in node ? (node.answer || node.query) : node.title,
-        query: 'query' in node ? node.query : undefined,
-        title: 'query' in node ? undefined : node.title,
+        label: 'query' in node ? (node.shortAnswer && node.shortAnswer.trim() ? node.shortAnswer : node.query) : node.title,
+        ...('query' in node ? { query: node.query } : { title: node.title }),
         pages: node.pages,
         conceptList: node.conceptList,
-        comparisonScore: 'comparisonScore' in node ? node.comparisonScore : undefined,
-        denned: 'denned' in node ? node.denned : undefined,
-        answer: 'answer' in node ? node.answer : undefined,
+        ...('comparisonScore' in node ? { comparisonScore: node.comparisonScore } : {}),
+        ...('denned' in node ? { denned: node.denned } : {}),
+        ...('answer' in node ? { answer: node.answer } : {}),
+        ...('shortAnswer' in node ? { shortAnswer: node.shortAnswer } : {}),
       },
       position,
       style: getNodeStyle(node, level)
@@ -270,7 +271,7 @@ export function generateKnowledgeGraph(centralNode: bigDaddyNode): GraphResult {
         source: parentId,
         target: nodeId,
         style: getEdgeStyle(comparisonScore),
-        label: comparisonScore > 0 ? `${(comparisonScore * 100).toFixed(0)}%` : undefined
+        ...(comparisonScore > 0 ? { label: `${(comparisonScore * 100).toFixed(0)}%` } : {})
       };
       edges.push(edge);
     }
@@ -286,6 +287,15 @@ export function generateKnowledgeGraph(centralNode: bigDaddyNode): GraphResult {
       });
     }
   }
+
+  // Debug: Log the central node details
+  console.log('🔍 Central node debug info:');
+  console.log('  - Query:', centralNode.query);
+  console.log('  - Answer:', centralNode.answer);
+  console.log('  - Answer length:', centralNode.answer?.length || 0);
+  console.log('  - Answer is empty?', !centralNode.answer || centralNode.answer.trim() === '');
+  console.log('  - Pages count:', centralNode.pages.length);
+  console.log('  - Concepts count:', centralNode.conceptList.length);
 
   // Start the recursive processing from the central node
   processNode(centralNode, null, 0, 0);

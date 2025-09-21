@@ -149,18 +149,27 @@ ${sourcesText}
 
 Instructions:
 1. Answer the question comprehensively using information from the provided sources
-2. Consider the relevant concepts when formulating your answer
+2. Consider the relevant concepts when formulating your answer and integrate them naturally
 3. Be factual and cite information appropriately
 4. If the sources don't contain enough information to fully answer the question, acknowledge this limitation
-5. Provide a clear, well-structured response
+5. Provide a clear, well-structured response that flows naturally
+6. Create a SHORT answer that is 5 words or less for display purposes
+7. Create a COMPREHENSIVE answer that includes:
+   - A detailed explanation of the topic
+   - Integration of the key concepts provided
+   - Clear structure and organization
+   - Relevant details from the sources
 
 Return your response in valid JSON format like this:
 {
-  "answer": "Your comprehensive answer here...",
-  "shortAnswer": "Your short version of the answer here..."
+  "answer": "Your comprehensive detailed answer here that integrates the concepts naturally...",
+  "shortAnswer": "Brief 5 word summary"
 }
 
-Make sure to include only the URLs of sources that you actually referenced in your answer.
+IMPORTANT: 
+- The shortAnswer must be 5 words or less and should capture the essence of the topic
+- The answer should naturally incorporate the provided concepts
+- Make sure to include only the URLs of sources that you actually referenced in your answer
 `;
 
     // Generate answer using Gemini API
@@ -188,6 +197,20 @@ Make sure to include only the URLs of sources that you actually referenced in yo
       };
     }
 
+    // Validate shortAnswer and ensure it's 5 words or less
+    let shortAnswer = parsedResponse.shortAnswer;
+    if (!shortAnswer || typeof shortAnswer !== 'string') {
+      // Generate a fallback short answer from the first few words of the main answer
+      const words = parsedResponse.answer.split(' ').slice(0, 5);
+      shortAnswer = words.join(' ');
+    } else {
+      // Ensure shortAnswer is 5 words or less
+      const words = shortAnswer.split(' ');
+      if (words.length > 5) {
+        shortAnswer = words.slice(0, 5).join(' ');
+      }
+    }
+
     // Ensure sources_used is an array (default to empty array if not provided)
     const sources_used = Array.isArray(parsedResponse.sources_used) 
       ? parsedResponse.sources_used 
@@ -196,7 +219,7 @@ Make sure to include only the URLs of sources that you actually referenced in yo
     return {
       success: true,
       answer: parsedResponse.answer,
-      shortAnswer: parsedResponse.shortAnswer
+      shortAnswer: shortAnswer
     };
 
   } catch (error) {

@@ -1,6 +1,7 @@
 // backend/src/services/search.ts
 import dotenv from 'dotenv';
 import type { bigDaddyNode, concept } from '../types/den.js';
+import { get_answer } from './get_answer.js';
 
 // Load environment variables
 dotenv.config({ path: '../.env' });
@@ -10,6 +11,29 @@ let centralBigDaddyNode: bigDaddyNode | null = null;
 
 let currentHopSession: string | null = null;
 let currentFocusNode: bigDaddyNode | null = null;
+
+
+// Add these functions to search.ts
+export function clearCentralBigDaddyNode(): void {
+  centralBigDaddyNode = null;
+  currentFocusNode = null;
+  currentHopSession = null;
+  console.log('🧹 Cleared all central node state');
+}
+
+// Function to clear all memory and reset state
+export function clearAllMemory(): void {
+  centralBigDaddyNode = null;
+  currentFocusNode = null;
+  currentHopSession = null;
+  console.log('🧹 Cleared all memory and reset state');
+}
+
+export async function resetCentralNodeForNewSearch(query: string, pages: Page[]): Promise<bigDaddyNode> {
+  console.log('🔄 Resetting central node for new search:', query);
+  clearCentralBigDaddyNode();
+  return await createCentralBigDaddyNode(query, pages);
+}
 
 // Global state getters and setters
 export function getCentralBigDaddyNode(): bigDaddyNode | null {
@@ -51,41 +75,75 @@ export function updateCentralNodeFromFocusNode(): void {
       console.log('🏠 Central node updated from focus node');
     }
     // If the focus node is a child of the central node, update the central node's children
-    else if (centralBigDaddyNode.children) {
+    else if (centralBigDaddyNode.children && currentFocusNode && 'title' in currentFocusNode) {
       const childIndex = centralBigDaddyNode.children.findIndex(child => 
-        child.title === currentFocusNode.title
+        child.title === (currentFocusNode as any).title
       );
       if (childIndex !== -1) {
         centralBigDaddyNode.children[childIndex] = currentFocusNode as any;
-        console.log('🏠 Updated child node in central node:', currentFocusNode.title);
+        console.log('🏠 Updated child node in central node:', (currentFocusNode as any).title);
       }
     }
   }
 }
 
 // Function to create a new central bigDaddyNode from search results
-export function createCentralBigDaddyNode(query: string, pages: Page[]): bigDaddyNode {
+export async function createCentralBigDaddyNode(query: string, pages: Page[]): Promise<bigDaddyNode> {
   const bigDaddyNode: bigDaddyNode = {
     query: query,
     pages: pages.map(page => page.url),
     conceptList: [], // Will be populated by other services
     children: [], // Will be populated by other services
-    answer: "" // Will be populated by other services
+    answer: `This is a knowledge graph about "${query}". The answer will be generated as more content is added to this node.` // Initial placeholder answer
   };
   
   setCentralBigDaddyNode(bigDaddyNode);
+  
+  // Generate an initial answer using the search results
+  try {
+    console.log('🤖 Generating initial answer for central node...');
+    console.log('📊 Query:', query);
+    console.log('📄 Pages count:', pages.length);
+    
+    if (pages.length > 0) {
+      const generalQuestion = `Provide a comprehensive overview and explanation of "${query}". Include key concepts, important details, and relevant information.`;
+      
+      const answerResult = await get_answer(
+        pages.map(page => page.url), // URLs from search results
+        [], // No concepts yet, will be populated later
+        generalQuestion
+      );
+
+      if (answerResult.success && answerResult.answer) {
+        bigDaddyNode.answer = answerResult.answer;
+        bigDaddyNode.shortAnswer = (typeof answerResult.shortAnswer === 'string' ? answerResult.shortAnswer : answerResult.answer.split(' ').slice(0, 5).join(' '));
+        console.log('✅ Successfully generated initial answer for central node');
+        console.log('📝 Short answer:', bigDaddyNode.shortAnswer);
+        console.log('📝 Full answer preview:', answerResult.answer.substring(0, 100) + '...');
+      } else {
+        console.warn(`⚠️ Failed to generate initial answer: ${answerResult.error}`);
+        // Keep the placeholder answer
+      }
+    } else {
+      console.log('📝 No pages available for answer generation');
+    }
+  } catch (error) {
+    console.error('❌ Error generating initial answer:', error);
+    // Keep the placeholder answer
+  }
+  
   return bigDaddyNode;
 }
 
 // Function to get or create the central bigDaddyNode
-export function getOrCreateCentralBigDaddyNode(query: string, pages: Page[]): bigDaddyNode {
+export async function getOrCreateCentralBigDaddyNode(query: string, pages: Page[]): Promise<bigDaddyNode> {
   if (centralBigDaddyNode) {
     console.log('🏠 Using existing central bigDaddyNode:', centralBigDaddyNode.query);
     return centralBigDaddyNode;
   }
   
   console.log('🏠 Creating new central bigDaddyNode for query:', query);
-  return createCentralBigDaddyNode(query, pages);
+  return await createCentralBigDaddyNode(query, pages);
 }
 
 export type Page = {
@@ -143,6 +201,7 @@ export async function search(query: string, opts: SearchOptions = {}): Promise<P
 }
 
 // Enhanced search function that creates and manages the central bigDaddyNode
+// In search.ts, modify this function:
 export async function searchWithCentralNode(query: string, opts: SearchOptions = {}): Promise<{
   pages: Page[];
   centralNode: bigDaddyNode;
@@ -154,18 +213,17 @@ export async function searchWithCentralNode(query: string, opts: SearchOptions =
   const pages = await search(query, opts);
   console.log(`📄 Found ${pages.length} search results`);
   
-  // Create or get the central bigDaddyNode
-  const centralNode = getOrCreateCentralBigDaddyNode(query, pages);
+  // ✅ ALWAYS create a fresh central node for new searches
+  const centralNode = await resetCentralNodeForNewSearch(query, pages);
   
-  // Generate a hop session ID (simple timestamp-based for now)
+  // Generate a hop session ID
   const hopSessionId = `hop_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   setCurrentHopSession(hopSessionId);
   
-  console.log('✅ Enhanced search completed:');
+  console.log('✅ Enhanced search completed with fresh central node:');
   console.log('  - Query:', centralNode.query);
   console.log('  - Pages:', centralNode.pages.length);
   console.log('  - Hop Session:', hopSessionId);
-  console.log('  - Focus Node:', currentFocusNode?.query || 'null');
   
   return {
     pages,

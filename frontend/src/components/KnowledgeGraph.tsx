@@ -33,6 +33,8 @@ const KnowledgeGraph: React.FC = () => {
   const [graphData, setGraphData] = useState<GraphData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedNode, setSelectedNode] = useState<any>(null);
+  const [showPopup, setShowPopup] = useState(false);
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -98,6 +100,19 @@ const KnowledgeGraph: React.FC = () => {
     [setEdges]
   );
 
+  // Handle node click
+  const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+    console.log('Node clicked:', node);
+    setSelectedNode(node);
+    setShowPopup(true);
+  }, []);
+
+  // Close popup
+  const closePopup = useCallback(() => {
+    setShowPopup(false);
+    setSelectedNode(null);
+  }, []);
+
   return (
     <div className="w-full h-screen bg-gray-900 text-white">
       {/* Header */}
@@ -150,6 +165,7 @@ const KnowledgeGraph: React.FC = () => {
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            onNodeClick={onNodeClick}
             fitView
             fitViewOptions={{ padding: 0.2 }}
             className="bg-gray-900"
@@ -162,11 +178,102 @@ const KnowledgeGraph: React.FC = () => {
               color="#374151" 
               gap={20} 
               size={1}
-              variant="dots"
             />
           </ReactFlow>
         )}
       </div>
+
+      {/* Node Details Popup */}
+      {showPopup && selectedNode && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-4xl max-h-[90vh] overflow-y-auto border border-gray-600 w-full">
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h3 className="text-2xl font-bold text-pink-500 mb-2">
+                  {selectedNode.data.query || selectedNode.data.title}
+                </h3>
+                <div className="flex items-center space-x-4 text-sm text-gray-400">
+                  <span className="flex items-center">
+                    <div className={`w-3 h-3 rounded-full mr-2 ${selectedNode.type === 'bigDaddy' ? 'bg-pink-500' : 'bg-green-500'}`}></div>
+                    {selectedNode.type === 'bigDaddy' ? 'Central Node' : 'Child Node'}
+                  </span>
+                  <span>{selectedNode.data.pages?.length || 0} sources</span>
+                  <span>{selectedNode.data.conceptList?.length || 0} concepts</span>
+                </div>
+              </div>
+              <button
+                onClick={closePopup}
+                className="text-gray-400 hover:text-white text-3xl font-bold p-2 hover:bg-gray-700 rounded"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="space-y-6">
+              {/* Short Answer */}
+              {selectedNode.data.shortAnswer && (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-300 mb-2">Quick Summary:</h4>
+                  <p className="text-lg font-medium text-white">{selectedNode.data.shortAnswer}</p>
+                </div>
+              )}
+              
+              {/* Detailed Information */}
+              {selectedNode.data.answer && (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-300 mb-2">Detailed Information:</h4>
+                  <p className="text-gray-200 leading-relaxed mb-4">{selectedNode.data.answer}</p>
+                </div>
+              )}
+              
+              {/* Concepts */}
+              {selectedNode.data.conceptList && selectedNode.data.conceptList.length > 0 && (
+                <div>
+                  <h4 className="text-lg font-semibold text-gray-300 mb-3 flex items-center">
+                    <span className="mr-2">🧠</span>
+                    Key Concepts
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedNode.data.conceptList.map((concept: any, index: number) => (
+                      <div
+                        key={index}
+                        className="bg-gradient-to-r from-pink-600 to-pink-500 text-white px-3 py-2 rounded-lg text-sm font-medium shadow-md hover:shadow-lg transition-shadow"
+                      >
+                        {concept.title}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Pages Used */}
+              {selectedNode.data.pages && selectedNode.data.pages.length > 0 && (
+                <div>
+                  <h4 className="text-lg font-semibold text-gray-300 mb-3 flex items-center">
+                    <span className="mr-2">📚</span>
+                    Sources Used
+                  </h4>
+                  <div className="space-y-3 max-h-60 overflow-y-auto bg-gray-700 rounded-lg p-4">
+                    {selectedNode.data.pages.map((page: string, index: number) => (
+                      <div key={index} className="bg-gray-600 p-3 rounded-lg hover:bg-gray-500 transition-colors">
+                        <a
+                          href={page}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-400 hover:text-blue-300 break-all text-sm flex items-start"
+                        >
+                          <span className="mr-2 text-gray-400">🔗</span>
+                          {page}
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Legend */}
       <div className="absolute bottom-4 left-4 bg-gray-800 p-4 rounded-lg border border-gray-600">
@@ -187,6 +294,11 @@ const KnowledgeGraph: React.FC = () => {
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 rounded-full bg-gray-500"></div>
             <span>Low Score (&lt;40%)</span>
+          </div>
+          <div className="pt-2 border-t border-gray-600 mt-2">
+            <div className="text-gray-300">
+              💡 Click any node to see detailed information
+            </div>
           </div>
         </div>
       </div>

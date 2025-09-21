@@ -286,7 +286,27 @@ app.whenReady().then(async () => {
 
   globalShortcut.register('Alt+W', async () => {
     currentFocusNode = null;
+    currentDenData = null;
     console.log('refreshing the prompt!!');
+    
+    // Clear memory on backend
+    try {
+      const response = await fetch('http://localhost:4000/clear-memory', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (response.ok) {
+        console.log('✅ Backend memory cleared successfully');
+      } else {
+        console.warn('⚠️ Failed to clear backend memory');
+      }
+    } catch (error) {
+      console.error('❌ Error clearing backend memory:', error);
+    }
+    
     win.loadURL('http://localhost:3000'); // This navigates the Electron window!
     updateState({ action: 'CLEAR_NODES' });
     lastUrl = undefined;

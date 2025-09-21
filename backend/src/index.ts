@@ -6,7 +6,8 @@ import { get_concepts } from './services/get_concepts.js';
 import { get_answer } from './services/get_answer.js';
 import { make_den_main } from './services/make_den_main.js';
 import { simplify_concepts } from './services/simplify_concepts.js';
-import { search, searchWithCentralNode, getCentralBigDaddyNode, getCurrentHopSession, getCurrentFocusNode, updateCentralNodeFromFocusNode, setCentralBigDaddyNode } from './services/search.js';
+import { search, searchWithCentralNode, getCentralBigDaddyNode, getCurrentHopSession, getCurrentFocusNode, updateCentralNodeFromFocusNode, setCentralBigDaddyNode, clearAllMemory } from './services/search.js';
+import type { bigDaddyNode } from './types/den.js';
 import { generateKnowledgeGraph, generatePreviewGraph, exportGraphData } from './services/graph_generator.js';
 import { burrow } from './services/burrow.js';
 import { get_comparisonScore } from './services/get_comparisonScore.js';
@@ -169,6 +170,23 @@ app.post('/update-central-node', (req: Request, res: Response) => {
   }
 });
 
+// New endpoint to clear all memory
+app.post('/clear-memory', (req: Request, res: Response) => {
+  try {
+    clearAllMemory();
+    res.json({
+      success: true,
+      message: 'All memory cleared successfully'
+    });
+  } catch (error) {
+    console.error('Error clearing memory:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to clear memory' 
+    });
+  }
+});
+
 // Test endpoint to simulate Ctrl+D operation
 app.post('/test-ctrl-d', async (req: Request, res: Response) => {
   try {
@@ -195,7 +213,9 @@ app.post('/test-ctrl-d', async (req: Request, res: Response) => {
     const result = await sendToDen(url, centralNode);
     
     // Update the central node with the result
-    setCentralBigDaddyNode(result.node);
+    if (result.node) {
+      setCentralBigDaddyNode(result.node as bigDaddyNode);
+    }
     
     res.json({
       success: true,
@@ -675,7 +695,7 @@ app.post('/send-to-den', async (req: Request, res: Response) => {
             if (value && typeof value === 'object') {
               cleaned[key] = {
                 type: 'query' in value ? 'bigDaddyNode' : 'babyNode',
-                identifier: value.query || value.title
+                identifier: ('query' in value ? value.query : 'title' in value ? value.title : 'unknown')
               };
             } else {
               cleaned[key] = value;
@@ -688,10 +708,10 @@ app.post('/send-to-den', async (req: Request, res: Response) => {
       }
 
       // Clean the result while preserving the full structure
-      const cleanResult = {
-        ...result,
-        node: cleanNodeForSerialization(result.node)
-      };
+        const cleanResult = {
+          ...result,
+          node: result.node ? cleanNodeForSerialization(result.node) : null
+        };
       
       res.json(cleanResult);
     } else {
@@ -893,6 +913,10 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   res.status(500).json({ error: 'Internal Server Error' });
 });
 
+// Clear memory on startup
+clearAllMemory();
+
 app.listen(PORT, () => {
   console.log(`Backend listening at http://localhost:${PORT}`);
+  console.log('🧹 Memory cleared on startup');
 });
