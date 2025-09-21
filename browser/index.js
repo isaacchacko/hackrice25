@@ -11,10 +11,105 @@ let currentHopSession = null;
 let currentDenData = null;
 // Global variable to track which node is currently the focus
 let currentFocusNode = null;
+// Global variables to track page navigation state
+let currentPageIndex = 0;
+let totalPages = 0;
 const fs = require('fs');
 const path = require('path');
 
 let lastUrl;
+
+// Helper function to create or update page counter
+async function updatePageCounter() {
+  console.log('📄 updatePageCounter called, totalPages:', totalPages, 'currentPageIndex:', currentPageIndex);
+  
+  // Only show counter if we have page data
+  if (totalPages === 0) {
+    console.log('📄 No pages available, skipping counter display');
+    return;
+  }
+  
+  try {
+    console.log('📄 Executing JavaScript to create page counter...');
+    await win.webContents.executeJavaScript(`
+      console.log('📄 Inside webContents, creating page counter...');
+      
+      // Remove existing page counter if it exists
+      const existingCounter = document.getElementById('page-counter');
+      if (existingCounter) {
+        console.log('📄 Removing existing counter');
+        existingCounter.remove();
+      }
+      
+      // Create page counter
+      const pageCounter = document.createElement('div');
+      pageCounter.id = 'page-counter';
+      pageCounter.style.cssText = \`
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+        font-weight: 500;
+        z-index: 2147483647;
+        user-select: none;
+        pointer-events: none;
+        animation: fadeIn 0.3s ease-out;
+      \`;
+      
+      // Add fade animation
+      const counterStyle = document.createElement('style');
+      counterStyle.textContent = \`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      \`;
+      document.head.appendChild(counterStyle);
+      
+      // Set counter content
+      pageCounter.textContent = \`Page ${currentPageIndex + 1} of ${totalPages}\`;
+      
+      // Add to page
+      document.body.appendChild(pageCounter);
+      
+      console.log('📄 Page counter created and added to page:', \`Page ${currentPageIndex + 1} of ${totalPages}\`);
+      console.log('📄 Page counter element:', pageCounter);
+    `);
+    console.log('📄 JavaScript execution completed');
+  } catch (error) {
+    console.error('Error updating page counter:', error);
+  }
+}
+
+// Helper function to ensure page counter is shown (with retries)
+async function ensurePageCounterShown() {
+  console.log('📄 ensurePageCounterShown called, totalPages:', totalPages, 'currentPageIndex:', currentPageIndex);
+  
+  if (totalPages === 0) {
+    console.log('📄 No pages available, skipping counter display');
+    return;
+  }
+  
+  // Try multiple times with increasing delays
+  const delays = [500, 1000, 2000, 3000];
+  
+  for (const delay of delays) {
+    setTimeout(async () => {
+      try {
+        console.log(`📄 Attempting to show page counter after ${delay}ms`);
+        await updatePageCounter();
+        console.log(`📄 Successfully attempted to show page counter after ${delay}ms`);
+      } catch (error) {
+        console.error(`Error showing page counter after ${delay}ms:`, error);
+      }
+    }, delay);
+  }
+}
 
 // Helper function to update a babyNode in the den data structure
 function updateBabyNodeInDenData(updatedBabyNode) {
@@ -54,6 +149,17 @@ function createWindow() {
   })
 
   win.loadFile('index.html')
+  
+  // Add page counter when webview loads
+  win.webContents.on('did-finish-load', async () => {
+    // Always try to show page counter if we have any page data
+    if (totalPages > 0) {
+      console.log('📄 did-finish-load: Showing page counter for', totalPages, 'pages');
+      ensurePageCounterShown();
+    } else {
+      console.log('📄 did-finish-load: No pages available, skipping counter display');
+    }
+  })
 
   // DevTools are now closed by default
   // Uncomment the line below if you need to open DevTools manually
@@ -68,7 +174,7 @@ server.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
 }));
 
-server.get('/url', (req, res) => {
+server.get('/url', async (req, res) => {
   const url = req.query.to;
   const hopSessionId = req.query.hopSessionId;
   const denData = req.query.denData;
@@ -80,6 +186,27 @@ server.get('/url', (req, res) => {
     if (hopSessionId) {
       currentHopSession = hopSessionId;
       console.log('🎯 Hop session set from URL request:', hopSessionId);
+      
+      // Always initialize page counter for hop session
+      // We'll get the total pages from the hop session data
+      try {
+        const hopResponse = await fetch(`http://localhost:4000/hop/${hopSessionId}`);
+        if (hopResponse.ok) {
+          const hopData = await hopResponse.json();
+          totalPages = hopData.pages?.length || 0;
+          currentPageIndex = hopData.currentIndex || 0;
+          console.log('📄 Initialized page counter:', `Page ${currentPageIndex + 1} of ${totalPages}`);
+          
+          // Show page counter immediately and with retries
+          console.log('📄 Calling updatePageCounter immediately...');
+          await updatePageCounter();
+          
+          // Also set up retries to ensure it appears
+          ensurePageCounterShown();
+        }
+      } catch (error) {
+        console.error('Error getting hop session info:', error);
+      }
     }
 
     // Set the den data if provided
@@ -284,10 +411,33 @@ app.whenReady().then(async () => {
     if (lastUrl) updateState({ action: 'CLEAR_NODES' });
   });
 
+  // Test shortcut to manually show page counter
+  globalShortcut.register('Alt+P', async () => {
+    console.log('🧪 Test: Manually showing page counter');
+    currentPageIndex = 0;
+    totalPages = 10;
+    await updatePageCounter();
+  });
+
   globalShortcut.register('Alt+W', async () => {
     currentFocusNode = null;
     currentDenData = null;
+    currentHopSession = null;
+    currentPageIndex = 0;
+    totalPages = 0;
     console.log('refreshing the prompt!!');
+    
+    // Clear page counter
+    try {
+      await win.webContents.executeJavaScript(`
+        const pageCounter = document.getElementById('page-counter');
+        if (pageCounter) {
+          pageCounter.remove();
+        }
+      `);
+    } catch (error) {
+      console.error('Error clearing page counter:', error);
+    }
     
     // Clear memory on backend
     try {
@@ -732,6 +882,10 @@ app.whenReady().then(async () => {
         console.log('  - Total pages:', result.hopState.pages.length);
         console.log('  - Query:', result.hopState.query);
 
+        // Update page counter state
+        currentPageIndex = result.hopState.currentIndex;
+        totalPages = result.hopState.pages.length;
+
         // Remove loading popup
         try {
           await win.webContents.executeJavaScript(`
@@ -744,6 +898,9 @@ app.whenReady().then(async () => {
         } catch (error) {
           console.error('Error removing hop popup:', error);
         }
+
+        // Update page counter
+        await updatePageCounter();
 
         // Navigate the Electron window to the new URL
         win.loadURL(newUrl);
@@ -868,6 +1025,10 @@ app.whenReady().then(async () => {
         console.log('  - Total pages:', result.hopState.pages.length);
         console.log('  - Query:', result.hopState.query);
 
+        // Update page counter state
+        currentPageIndex = result.hopState.currentIndex;
+        totalPages = result.hopState.pages.length;
+
         // Remove loading popup
         try {
           await win.webContents.executeJavaScript(`
@@ -880,6 +1041,9 @@ app.whenReady().then(async () => {
         } catch (error) {
           console.error('Error removing hop popup:', error);
         }
+
+        // Update page counter
+        await updatePageCounter();
 
         // Navigate the Electron window to the new URL
         win.loadURL(newUrl);
