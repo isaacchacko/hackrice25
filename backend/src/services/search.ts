@@ -1,7 +1,9 @@
 // backend/src/services/search.ts
 import dotenv from 'dotenv';
-import type { bigDaddyNode, concept } from '../types/den.js';
+import type { bigDaddyNode, concept, babyNode } from '../types/den.js';
 import { get_answer } from './get_answer.js';
+import { burrow } from './burrow.js';
+import { sendToDen } from './send_toDen.js';
 
 // Load environment variables
 dotenv.config({ path: '../.env' });
@@ -312,5 +314,60 @@ async function safeText(res: Response) {
     return await res.text();
   } catch {
     return "";
+  }
+}
+
+/**
+ * Initiates burrowing into a child node by creating a burrow session
+ * @param centralNode - The central bigDaddyNode containing the child to burrow into
+ * @param childTitle - The title of the child node to burrow into
+ * @returns Promise containing the burrow session or error information
+ */
+export async function initiateBurrowIntoChildNode(centralNode: bigDaddyNode, childTitle: string): Promise<{
+  success: boolean;
+  centralNode?: bigDaddyNode;
+  childNode?: babyNode;
+  burrowSession?: any;
+  error?: string;
+}> {
+  try {
+    console.log(`🔍 Initiating burrow into child node: "${childTitle}"`);
+    console.log(`🔍 Available child titles:`, centralNode.children.map(c => c.title));
+    
+    // Find the child node by title
+    const childNode = centralNode.children.find(child => child.title === childTitle);
+    
+    if (!childNode) {
+      return {
+        success: false,
+        error: `Child node with title "${childTitle}" not found`
+      };
+    }
+    
+    console.log(`✅ Found child node: "${childNode.title}"`);
+    
+    // Set the child node as a den (isDen = true)
+    childNode.isDen = true;
+    console.log(`🏠 Set "${childNode.title}" as a den (isDen = true)`);
+    
+    // Create a burrow session for this child node
+    const { createBurrowSession } = await import('./burrow_session.js');
+    const burrowSession = await createBurrowSession(childTitle, childTitle);
+    
+    console.log(`🎉 Burrow session created! Found ${burrowSession.pages.length} pages to explore`);
+    
+    return {
+      success: true,
+      centralNode,
+      childNode,
+      burrowSession
+    };
+    
+  } catch (error) {
+    console.error('❌ Error in initiateBurrowIntoChildNode:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
   }
 }

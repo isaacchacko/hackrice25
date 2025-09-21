@@ -6,7 +6,7 @@ import { get_concepts } from './services/get_concepts.js';
 import { get_answer } from './services/get_answer.js';
 import { make_den_main } from './services/make_den_main.js';
 import { simplify_concepts } from './services/simplify_concepts.js';
-import { search, searchWithCentralNode, getCentralBigDaddyNode, getCurrentHopSession, getCurrentFocusNode, updateCentralNodeFromFocusNode, setCentralBigDaddyNode, clearAllMemory } from './services/search.js';
+import { search, searchWithCentralNode, getCentralBigDaddyNode, getCurrentHopSession, getCurrentFocusNode, updateCentralNodeFromFocusNode, setCentralBigDaddyNode, clearAllMemory, initiateBurrowIntoChildNode } from './services/search.js';
 import type { bigDaddyNode } from './types/den.js';
 import { generateKnowledgeGraph, generatePreviewGraph, exportGraphData } from './services/graph_generator.js';
 import { burrow } from './services/burrow.js';
@@ -118,9 +118,15 @@ app.get('/search', async (req: Request, res: Response) => {
 // New endpoint to get the current central node state
 app.get('/central-node-state', (req: Request, res: Response) => {
   try {
+    console.log('🔍 Getting central node state...');
     const centralNode = getCentralBigDaddyNode();
+    console.log('📊 Central node:', centralNode ? 'exists' : 'null');
+    
     const hopSession = getCurrentHopSession();
+    console.log('📊 Hop session:', hopSession ? 'exists' : 'null');
+    
     const focusNode = getCurrentFocusNode();
+    console.log('📊 Focus node:', focusNode ? 'exists' : 'null');
     
     res.json({
       success: true,
@@ -132,7 +138,7 @@ app.get('/central-node-state', (req: Request, res: Response) => {
       hasFocusNode: focusNode !== null
     });
   } catch (error) {
-    console.error('Error getting central node state:', error);
+    console.error('❌ Error getting central node state:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to get central node state' 
@@ -657,6 +663,82 @@ app.post('/burrow', async (req: Request, res: Response) => {
   }
 });
 
+// New burrow endpoint for initiating burrow sessions
+app.post('/burrow-into-child', async (req: Request, res: Response) => {
+  try {
+    const { childTitle } = req.body;
+
+    if (!childTitle) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'childTitle is required' 
+      });
+    }
+
+    const centralNode = getCentralBigDaddyNode();
+    if (!centralNode) {
+      return res.status(400).json({
+        success: false,
+        error: 'No central node available. Please search first to create a central node.'
+      });
+    }
+
+    console.log(`🔍 Initiating burrow into child node: "${childTitle}"`);
+    
+    // Use the initiateBurrowIntoChildNode function
+    const result = await initiateBurrowIntoChildNode(centralNode, childTitle);
+    
+    if (result.success) {
+      // Update the central node with the result
+      setCentralBigDaddyNode(result.centralNode!);
+      
+      // Clean the result for serialization (remove circular references)
+      function cleanNodeForSerialization(obj: any): any {
+        if (!obj || typeof obj !== 'object') return obj;
+        
+        if (Array.isArray(obj)) {
+          return obj.map(item => cleanNodeForSerialization(item));
+        }
+        
+        const cleaned: any = {};
+        for (const [key, value] of Object.entries(obj)) {
+          if (key === 'parent') {
+            // Replace parent with just an identifier to avoid circular refs
+            if (value && typeof value === 'object') {
+              cleaned[key] = {
+                type: 'query' in value ? 'bigDaddyNode' : 'babyNode',
+                identifier: ('query' in value ? value.query : 'title' in value ? value.title : 'unknown')
+              };
+            } else {
+              cleaned[key] = value;
+            }
+          } else {
+            cleaned[key] = cleanNodeForSerialization(value);
+          }
+        }
+        return cleaned;
+      }
+
+      const cleanResult = {
+        ...result,
+        centralNode: result.centralNode ? cleanNodeForSerialization(result.centralNode) : null,
+        childNode: result.childNode ? cleanNodeForSerialization(result.childNode) : null
+      };
+      
+      res.json(cleanResult);
+    } else {
+      console.error('❌ Burrow initiation failed:', result.error);
+      res.status(500).json(result);
+    }
+  } catch (error) {
+    console.error('Error in /burrow-into-child:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Internal server error' 
+    });
+  }
+});
+
 app.post('/send-to-den', async (req: Request, res: Response) => {
   try {
     const { url, node } = req.body;
@@ -907,6 +989,241 @@ app.get('/hop-sessions', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error in /hop-sessions:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Burrow session endpoints
+app.get('/burrow/:childNodeId', async (req: Request, res: Response) => {
+  try {
+    const { childNodeId } = req.params;
+    
+    if (!childNodeId || typeof childNodeId !== 'string') {
+      return res.status(400).json({ error: 'Valid childNodeId is required' });
+    }
+    
+    const { getBurrowSession } = await import('./services/burrow_session.js');
+    const burrowState = getBurrowSession(childNodeId);
+    
+    if (!burrowState) {
+      return res.status(404).json({ error: 'Burrow session not found' });
+    }
+    
+    res.json({
+      success: true,
+      burrowState,
+      currentPage: burrowState.pages[burrowState.currentIndex]
+    });
+  } catch (error) {
+    console.error('Error in /burrow/:childNodeId:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/burrow/:childNodeId/navigate', async (req: Request, res: Response) => {
+  try {
+    const { childNodeId } = req.params;
+    const { direction } = req.body;
+
+    if (!childNodeId || typeof childNodeId !== 'string') {
+      return res.status(400).json({ error: 'Valid childNodeId is required' });
+    }
+
+    if (!direction || !['next', 'prev'].includes(direction)) {
+      return res.status(400).json({ error: 'Direction must be "next" or "prev"' });
+    }
+
+    const { navigateBurrow } = await import('./services/burrow_session.js');
+    const burrowState = navigateBurrow(childNodeId, direction);
+    
+    if (!burrowState) {
+      return res.status(404).json({ error: 'Burrow session not found' });
+    }
+    
+    res.json({
+      success: true,
+      burrowState,
+      currentPage: burrowState.pages[burrowState.currentIndex]
+    });
+  } catch (error) {
+    console.error('Error in /burrow/:childNodeId/navigate:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/burrow/:childNodeId/current', async (req: Request, res: Response) => {
+  try {
+    const { childNodeId } = req.params;
+    
+    if (!childNodeId || typeof childNodeId !== 'string') {
+      return res.status(400).json({ error: 'Valid childNodeId is required' });
+    }
+    
+    const { getCurrentBurrowPage } = await import('./services/burrow_session.js');
+    const currentPage = getCurrentBurrowPage(childNodeId);
+    
+    if (!currentPage) {
+      return res.status(404).json({ error: 'Burrow session not found' });
+    }
+    
+    res.json({
+      success: true,
+      currentPage
+    });
+  } catch (error) {
+    console.error('Error in /burrow/:childNodeId/current:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/burrow/:childNodeId/pages', async (req: Request, res: Response) => {
+  try {
+    const { childNodeId } = req.params;
+    
+    if (!childNodeId || typeof childNodeId !== 'string') {
+      return res.status(400).json({ error: 'Valid childNodeId is required' });
+    }
+    
+    const { getAllBurrowPages } = await import('./services/burrow_session.js');
+    const pages = getAllBurrowPages(childNodeId);
+    
+    if (!pages) {
+      return res.status(404).json({ error: 'Burrow session not found' });
+    }
+    
+    res.json({
+      success: true,
+      pages
+    });
+  } catch (error) {
+    console.error('Error in /burrow/:childNodeId/pages:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.delete('/burrow/:childNodeId', async (req: Request, res: Response) => {
+  try {
+    const { childNodeId } = req.params;
+    
+    if (!childNodeId || typeof childNodeId !== 'string') {
+      return res.status(400).json({ error: 'Valid childNodeId is required' });
+    }
+    
+    const { deleteBurrowSession } = await import('./services/burrow_session.js');
+    const deleted = deleteBurrowSession(childNodeId);
+    
+    if (!deleted) {
+      return res.status(404).json({ error: 'Burrow session not found' });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Burrow session deleted'
+    });
+  } catch (error) {
+    console.error('Error in DELETE /burrow/:childNodeId:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/burrow-sessions', async (req: Request, res: Response) => {
+  try {
+    const { listActiveBurrowSessions } = await import('./services/burrow_session.js');
+    const sessionIds = listActiveBurrowSessions();
+    res.json({
+      success: true,
+      sessions: sessionIds
+    });
+  } catch (error) {
+    console.error('Error in /burrow-sessions:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Add page to burrowed child node
+app.post('/burrow/:childNodeId/add-page', async (req: Request, res: Response) => {
+  try {
+    const { childNodeId } = req.params;
+    const { url } = req.body;
+
+    if (!childNodeId || typeof childNodeId !== 'string') {
+      return res.status(400).json({ error: 'Valid childNodeId is required' });
+    }
+
+    if (!url) {
+      return res.status(400).json({ error: 'URL is required' });
+    }
+
+    // Get the central node
+    const centralNode = getCentralBigDaddyNode();
+    if (!centralNode) {
+      return res.status(400).json({
+        success: false,
+        error: 'No central node available. Please search first to create a central node.'
+      });
+    }
+
+    // Find the child node by title (childNodeId is the title)
+    const childNode = centralNode.children.find(child => child.title === childNodeId);
+    if (!childNode) {
+      return res.status(404).json({
+        success: false,
+        error: `Child node "${childNodeId}" not found`
+      });
+    }
+
+    console.log(`🕳️ Adding page to burrowed child node: "${childNodeId}"`);
+    console.log(`📄 URL: ${url}`);
+
+    // Use sendToDen to process the page and add concepts as children to the burrowed node
+    const result = await sendToDen(url, childNode);
+    
+    if (result.success) {
+      // Update the central node with the result
+      setCentralBigDaddyNode(centralNode);
+      
+      // Clean the result for serialization (remove circular references)
+      function cleanNodeForSerialization(obj: any): any {
+        if (!obj || typeof obj !== 'object') return obj;
+        
+        if (Array.isArray(obj)) {
+          return obj.map(item => cleanNodeForSerialization(item));
+        }
+        
+        const cleaned: any = {};
+        for (const [key, value] of Object.entries(obj)) {
+          if (key === 'parent') {
+            // Replace parent with just an identifier to avoid circular refs
+            if (value && typeof value === 'object') {
+              cleaned[key] = {
+                type: 'query' in value ? 'bigDaddyNode' : 'babyNode',
+                identifier: ('query' in value ? value.query : 'title' in value ? value.title : 'unknown')
+              };
+            } else {
+              cleaned[key] = value;
+            }
+          } else {
+            cleaned[key] = cleanNodeForSerialization(value);
+          }
+        }
+        return cleaned;
+      }
+
+      const cleanResult = {
+        ...result,
+        node: result.node ? cleanNodeForSerialization(result.node) : null
+      };
+      
+      res.json(cleanResult);
+    } else {
+      console.error('❌ Failed to add page to burrowed child:', result.error);
+      res.status(500).json(result);
+    }
+  } catch (error) {
+    console.error('Error in /burrow/:childNodeId/add-page:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Internal server error' 
+    });
   }
 });
 

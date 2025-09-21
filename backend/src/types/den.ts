@@ -12,6 +12,7 @@ export type babyNode = {
   denPages?: string[]; // Pages added via Ctrl+D (den operations)
   conceptList: concept[];
   denned: boolean;
+  isDen: boolean; // Whether this node can have children attached to it (for burrowing)
   parent: babyNode | bigDaddyNode | null;
   children: babyNode[];
   comparisonScore: number;
