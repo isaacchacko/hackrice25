@@ -54,9 +54,13 @@ export function getBurrowSession(childNodeId: string): BurrowSession | null {
 }
 
 export function navigateBurrow(childNodeId: string, direction: 'next' | 'prev'): BurrowSession | null {
+  console.log(`🔍 DEBUG: navigateBurrow called with childNodeId: "${childNodeId}"`);
+  console.log(`🔍 DEBUG: Available burrow sessions:`, Array.from(burrowSessions.keys()));
+  
   const session = burrowSessions.get(childNodeId);
   if (!session) {
     console.log(`❌ Cannot navigate: burrow session not found: ${childNodeId}`);
+    console.log(`🔍 DEBUG: Available sessions:`, Array.from(burrowSessions.keys()));
     return null;
   }
   

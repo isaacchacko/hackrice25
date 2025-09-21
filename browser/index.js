@@ -1036,6 +1036,7 @@ app.whenReady().then(async () => {
 
       try {
         console.log('🔄 Navigating to previous page in burrow session...');
+        console.log('🔍 DEBUG: currentBurrowSession value:', currentBurrowSession);
         const response = await fetch(`http://localhost:4000/burrow/${currentBurrowSession}/navigate`, {
           method: 'POST',
           headers: {
@@ -1319,6 +1320,7 @@ app.whenReady().then(async () => {
 
       try {
         console.log('🔄 Navigating to next page in burrow session...');
+        console.log('🔍 DEBUG: currentBurrowSession value:', currentBurrowSession);
         const response = await fetch(`http://localhost:4000/burrow/${currentBurrowSession}/navigate`, {
           method: 'POST',
           headers: {

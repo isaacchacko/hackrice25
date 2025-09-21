@@ -8,11 +8,13 @@ import type { concept, babyNode, bigDaddyNode, SendToDenResponse } from '../type
  * Processes a URL by extracting concepts and adding them to a node
  * @param url - The URL to process and extract concepts from
  * @param node - The babyNode or bigDaddyNode to add concepts and URL to
+ * @param originQuery - The original query from the bigDaddyNode for comparison scoring
  * @returns Promise containing the updated node or error information
  */
 export async function sendToDen(
   url: string,
-  node: babyNode | bigDaddyNode
+  node: babyNode | bigDaddyNode,
+  originQuery?: string
 ): Promise<SendToDenResponse> {
   console.log('🚀 sendToDen called with:', {
     url,
@@ -104,6 +106,12 @@ export async function sendToDen(
         }
       } else {
         // Create new child node
+        console.log(`🔍 DEBUG: Creating child node for concept: "${concept.title}"`);
+        console.log(`🔍 DEBUG: Origin query available: "${originQuery || 'NONE'}"`);
+        
+        const comparisonScoreOriginValue = originQuery ? await get_comparisonScore(concept.title, originQuery) : 0;
+        console.log(`🔍 DEBUG: Comparison score result: ${comparisonScoreOriginValue}`);
+        
         const childNode: babyNode = {
           title: concept.title,
           pages: [url],
@@ -112,22 +120,40 @@ export async function sendToDen(
           isDen: false, // Default to false - can be set to true when burrowing
           parent: null, // Set to null initially to avoid circular refs during processing
           children: [],
-          comparisonScore: comparisonScore / 100
+          comparisonScore: comparisonScore / 100,
+          comparisonScoreOrigin: comparisonScoreOriginValue,
+          originQuery: originQuery || ''
         };
 
         newChildNodes.push(childNode);
-        console.log(`✅ Created new child node: "${concept.title}" (score: ${comparisonScore})`);
+        console.log(`✅ Created new child node: "${concept.title}"`);
+        console.log(`  - Regular score: ${comparisonScore / 100}`);
+        console.log(`  - Origin score: ${comparisonScoreOriginValue}`);
+        console.log(`  - Origin query: "${originQuery || 'N/A'}"`);
       }
     }
 
     // Add new child nodes to the parent node's children array
     if ('children' in node) {
       node.children.push(...newChildNodes);
-
+      
       // Set parent references after adding to avoid circular issues during processing
       newChildNodes.forEach(child => {
         child.parent = node;
       });
+      
+      // Update existing child nodes that might be missing comparisonScoreOrigin
+      if (originQuery) {
+        console.log(`🔄 Updating existing child nodes with comparisonScoreOrigin...`);
+        for (const existingChild of node.children) {
+          if (existingChild.comparisonScoreOrigin === undefined || existingChild.comparisonScoreOrigin === 0) {
+            const originScore = await get_comparisonScore(existingChild.title, originQuery);
+            existingChild.comparisonScoreOrigin = originScore;
+            existingChild.originQuery = originQuery;
+            console.log(`  - Updated "${existingChild.title}": originScore = ${originScore}`);
+          }
+        }
+      }
 
       console.log(`📈 Added ${newChildNodes.length} child nodes to parent`);
     }
